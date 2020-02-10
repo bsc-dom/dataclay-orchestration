@@ -6,7 +6,7 @@ Scripts to deploy dataClay through singularity-compose.
 ├── scripts 
 │   ├── dataclay_start.sh : start dataclay through singularity-compose
 │   ├── dataclay_stop.sh : gracefully stop dataclay through singularity-compose
-│   ├── clean.sh : clean dataclay logs and files
+│   ├── dataclay_clean.sh : clean dataclay logs and files
 ├── default_environment.sh : machine-dependene default environment variables
 ├── prepare_environment.sh : prepare scripts to set jobs' environment variables
 ├── singularity-compose-templates: needed to generate singularity-compose files
