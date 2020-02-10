@@ -1,0 +1,5 @@
+  dspython:
+    build:
+      context: ./images
+    volumes:
+      - ./env.sh:/.singularity.d/env/env.sh
