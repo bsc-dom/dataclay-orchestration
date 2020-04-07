@@ -3,3 +3,7 @@
       context: ./images
     volumes:
       - ./env.sh:/.singularity.d/env/env.sh
+      - /usr/lib64:/usr/lib64
+    depends_on:
+      - DSJAVA_DEP
+    command: ""

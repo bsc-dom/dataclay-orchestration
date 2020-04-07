@@ -1,1 +1,0 @@
-singularity-compose down

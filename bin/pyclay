@@ -1,0 +1,41 @@
+#!/bin/bash
+PREFIX="[pyclay]"
+function dataclayecho(){ echo "$PREFIX ${1}"; }
+function dataclayerr(){ echo "!! $PREFIX ERROR: ${1}"; exit 1; }
+function dataclaywarn(){ echo "$PREFIX WARNING: ${1}"; }
+function dataclayinfo(){ echo "$PREFIX ${1}"; }
+if [ "$#" -lt 2 ]; then
+	dataclayerr "Usage: pyclay <appsrc> <main> <args>"
+fi
+APP_SOURCE=$1
+APP_MAIN=$2
+if [[ $APP_SOURCE != /* ]]; then
+    dataclayerr "App source path must be absolute. Found ${APP_SOURCE}" 
+fi
+if [[ $APP_MAIN == /* ]]; then
+    dataclayerr "Main class path must be relative. Found ${APP_MAIN}" 
+fi
+# ------------------------------ dataClay Job configuration -------------------------------------------
+if [ -z $DATACLAY_JOBID ]; then 
+	ID=$(dataclayid $PPID)
+	if [ ! -z $ID ]; then export DATACLAY_JOBID=$ID; fi
+	if [ -z $DATACLAY_JOBID ]; then
+    	dataclayerr "DATACLAY_JOBID not found. Aborting."
+	fi
+fi
+JOB_CONFIG="$HOME/.dataClay/$DATACLAY_JOBID/client.config"
+source $JOB_CONFIG
+# Source prolog script 
+if [ ! -z $PROLOG ]; then 
+	if [[ $PROLOG != /* ]]; then source $DATACLAY_PROLOGS/$PROLOG
+	else source $PROLOG; fi
+fi
+
+#------------------------------------------------------------------------------------------------------
+scp -r ${APP_SOURCE}/* ${CLIENTNODE}:${APP_PATH}
+echo "$JOB_FOLDER/client exec /home/dataclayusr/dataclay/entrypoints/dataclay-python-entry-point $FLAGS ${@:2}" | ssh "${CLIENTNODE}" bash -s
+
+if [ $TRACING == true ]; then 
+	dataclayinfo "Copying traces from ${CLIENTNODE}:${APP_PATH}/trace"
+	scp -r ${CLIENTNODE}:${APP_PATH}/trace .
+fi

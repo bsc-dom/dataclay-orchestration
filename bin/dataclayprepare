@@ -1,0 +1,95 @@
+#!/bin/bash
+set -e
+PREFIX="[dataclayprepare]"
+function dataclayecho(){ echo "$PREFIX ${1}"; }
+function dataclayerr(){ echo "!! $PREFIX ERROR: ${1}"; exit 1; }
+function dataclaywarn(){ echo "$PREFIX WARNING: ${1}"; }
+function dataclayinfo(){ echo "$PREFIX ${1}"; }
+# Args
+declare -a ARGS
+while test $# -gt 0
+do
+	case "$1" in
+			--marenostrum) 
+		    	export DATACLAY_JOBID=$SLURM_JOBID
+	            dataclayecho "- provided job id = $DATACLAY_JOBID"
+		    	;;
+			--*) 
+				dataclayerr "Wrong option $1 provided" 
+				;;
+			*)  
+				ARGS+=(${1})
+            ;;
+    esac
+    shift
+done
+
+if [ ${#ARGS[@]} -ne 3 ]; then
+    dataclayerr "Wrong number of arguments. Found ${ARGS[@]}
+             Usage: $0 <modelpath> <namespace> <language> <--option1> <--option2...> where: 
+                  - modelpath: path where .py files or .class files are located depending on the language 
+                  - language: either java or python
+	"
+fi 
+
+MODELSRCPATH="${ARGS[0]}"
+DATACLAY_NAMESPACE="${ARGS[1]}"
+LANGUAGE="${ARGS[2]}"
+# Check paths
+if [[ $MODELSRCPATH != /* ]]; then
+    dataclayerr "Model path must be absolute. Found $MODELSRCPATH" 
+fi
+if [ ! -d $MODELSRCPATH ]; then
+    dataclayerr "Model path does not exist. Found $MODELSRCPATH"
+fi
+
+# ------------------------------ dataClay Job configuration -------------------------------------------
+if [ -z $DATACLAY_JOBID ]; then 
+	ID=$(dataclayid $PPID)
+	if [ ! -z $ID ]; then export DATACLAY_JOBID=$ID; fi
+	if [ -z $DATACLAY_JOBID ]; then
+    	dataclayerr "DATACLAY_JOBID not found. Aborting."
+	fi
+fi 
+
+JOB_CONFIG="$HOME/.dataClay/$DATACLAY_JOBID/client.config"
+source $JOB_CONFIG
+
+# Source prolog script 
+if [ ! -z $PROLOG ]; then 
+	if [[ $PROLOG != /* ]]; then source $DATACLAY_PROLOGS/$PROLOG
+	else source $PROLOG; fi
+fi
+
+#------------------------------------------------------------------------------------------------------
+
+# Register account  
+dataclay NewAccount $DATACLAY_USR $DATACLAY_PWD
+# Register datacontract
+dataclay NewDataContract ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_DATASET} ${DATACLAY_USR}
+# Register model
+if [ $LANGUAGE == "java" ]; then 
+	# Compile classes 
+	MODELBINPATH=$MODEL_PATH
+	mkdir -p $MODELBINPATH
+	javac -cp $DATACLAY_JAR $(find ${MODELSRCPATH} -name *.java) -d ${MODEL_PATH}
+else 
+	MODELBINPATH=$MODELSRCPATH
+fi 
+scp -r ${MODELBINPATH}/* ${CLIENTNODE}:${MODEL_PATH}
+dataclay NewModel ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_NAMESPACE} ${MODEL_PATH} $LANGUAGE
+# Get stubs 
+dataclay GetStubs ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_NAMESPACE} ${STUBS_PATH}
+
+
+
+
+
+
+
+
+
+
+
+
+

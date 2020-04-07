@@ -1,0 +1,41 @@
+#!/bin/bash
+function print_logs { 
+	HOST_FOLDER=$1
+	ORIGIN_FOLDER=$(readlink $HOST_FOLDER)
+	HOST_FOLDER=$(realpath --relative-to=. $ORIGIN_FOLDER)
+	HOSTNAME=${HOST_FOLDER#?}
+	JOB_CONFIG=${HOME}/.dataClay/${DATACLAY_JOBID}/${HOSTNAME}.config
+	source $JOB_CONFIG
+	
+	# shared FS
+	pushd $HOME/.singularity/instances/logs/$HOSTNAME/$USER/ >/dev/null
+	echo "================ $1 ================"
+	grep --color=always "" ${PATTERN}* 2>/dev/null
+	popd >/dev/null
+	# try to scp 
+	
+	#echo "cd \$HOME/.singularity/instances/logs/$HOSTNAME/\$USER/; grep "" *" | ssh "${CLIENTNODE}" bash -s
+
+} 
+if [ "$#" -ne 1 ] && [ "$#" -ne 2 ] ; then
+	echo "ERROR: usage: $0 <jobid> <optional:pattern> "
+	echo "	 pattern: if not provided * is set as pattern, logicmodule, dspython*, dsjava_localhost, dsjava*, ds* (grep style pattern)"
+	exit 1
+fi
+DATACLAY_JOBID=$1
+if [ ! -d  $HOME/.dataClay/$DATACLAY_JOBID/ ]; then 
+	echo "${red}${bold} ERROR: Logs for job with ID = $DATACLAY_JOBID not found.${end}"
+	exit 1
+fi 
+PATTERN="*"
+if [ "$#" -gt 1 ]; then
+	PATTERN=$2
+fi
+
+# for each host in the job, get it and store in folder 
+pushd $HOME/.dataClay/$DATACLAY_JOBID/ >/dev/null
+print_logs LM
+for HOST_FOLDER in $(ls -d DS_[^.]* | grep -v config); do
+	print_logs $HOST_FOLDER
+done
+popd >/dev/null
