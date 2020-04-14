@@ -1,21 +1,15 @@
 #!/bin/bash
-function print_logs { 
-	HOST_FOLDER=$1
-	ORIGIN_FOLDER=$(readlink $HOST_FOLDER)
-	HOST_FOLDER=$(realpath --relative-to=. $ORIGIN_FOLDER)
-	HOSTNAME=${HOST_FOLDER#?}
-	JOB_CONFIG=${HOME}/.dataClay/${DATACLAY_JOBID}/${HOSTNAME}.config
-	source $JOB_CONFIG
-	
-	# shared FS
-	pushd $HOME/.singularity/instances/logs/$HOSTNAME/$USER/ >/dev/null
-	echo "================ $1 ================"
-	grep --color=always "" ${PATTERN}* 2>/dev/null
-	popd >/dev/null
-	# try to scp 
-	
-	#echo "cd \$HOME/.singularity/instances/logs/$HOSTNAME/\$USER/; grep "" *" | ssh "${CLIENTNODE}" bash -s
-
+function get_logs { 
+	HOSTNAME=$1
+	LOG_DIR=${HOME}/.dataClay/${DATACLAY_JOBID}/logs
+	FILES=$(ssh $HOSTNAME "find .singularity/instances/logs/ -type f")
+	mkdir -p $LOG_DIR
+	for FILE in $FILES; do
+		FILENAME=$(basename $FILE) 
+		if [ ! -f $LOG_DIR/$FILENAME ]; then 
+			scp -r $HOSTNAME:$FILE $LOG_DIR
+		fi
+	done
 } 
 if [ "$#" -ne 1 ] && [ "$#" -ne 2 ] ; then
 	echo "ERROR: usage: $0 <jobid> <optional:pattern> "
@@ -24,18 +18,29 @@ if [ "$#" -ne 1 ] && [ "$#" -ne 2 ] ; then
 fi
 DATACLAY_JOBID=$1
 if [ ! -d  $HOME/.dataClay/$DATACLAY_JOBID/ ]; then 
-	echo "${red}${bold} ERROR: Logs for job with ID = $DATACLAY_JOBID not found.${end}"
+	echo "ERROR: Logs for job with ID = $DATACLAY_JOBID not found."
 	exit 1
 fi 
 PATTERN="*"
 if [ "$#" -gt 1 ]; then
 	PATTERN=$2
 fi
+# ------------------------------ dataClay Job configuration -------------------------------------------
+JOB_CONFIG="$HOME/.dataClay/$DATACLAY_JOBID/job.config"
+source $JOB_CONFIG
+#------------------------------------------------------------------------------------------------------
 
 # for each host in the job, get it and store in folder 
+echo "Getting logs into $HOME/.dataClay/$DATACLAY_JOBID/logs ..."
 pushd $HOME/.dataClay/$DATACLAY_JOBID/ >/dev/null
-print_logs LM
-for HOST_FOLDER in $(ls -d DS_[^.]* | grep -v config); do
-	print_logs $HOST_FOLDER
+get_logs $LMNODE
+for NODE in $DSNODES; do
+	get_logs $NODE 
 done
+get_logs $CLIENTNODE
+popd >/dev/null
+
+pushd $LOG_DIR >/dev/null
+echo "================ LOGS ================"
+grep --color=always "" ${PATTERN}* 2>/dev/null
 popd >/dev/null

@@ -70,14 +70,12 @@ dataclay NewDataContract ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_DATASET} ${D
 # Register model
 if [ $LANGUAGE == "java" ]; then 
 	# Compile classes 
-	MODELBINPATH=$MODEL_PATH
-	mkdir -p $MODELBINPATH
-	javac -cp $DATACLAY_JAR $(find ${MODELSRCPATH} -name *.java) -d ${MODEL_PATH}
+	scp -q -r ${MODELSRCPATH} ${CLIENTNODE}:${MODEL_PATH}
+	echo "$JOB_FOLDER/client exec javac -cp ${DATACLAY_JAR} \$(find ${MODEL_PATH} -name *.java) -d ${MODEL_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
 else 
-	MODELBINPATH=$MODELSRCPATH
+	scp -q -r ${MODELSRCPATH}/* ${CLIENTNODE}:${MODEL_BIN_PATH}
 fi 
-scp -r ${MODELBINPATH}/* ${CLIENTNODE}:${MODEL_PATH}
-dataclay NewModel ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_NAMESPACE} ${MODEL_PATH} $LANGUAGE
+dataclay NewModel ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_NAMESPACE} ${MODEL_BIN_PATH} $LANGUAGE
 # Get stubs 
 dataclay GetStubs ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_NAMESPACE} ${STUBS_PATH}
 

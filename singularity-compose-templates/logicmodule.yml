@@ -1,7 +1,0 @@
-  logicmodule:
-    build:
-      context: ./images
-    volumes:
-      - ./env.sh:/.singularity.d/env/env.sh
-      - ./cfgfiles/log4j2.xml:/home/dataclayusr/dataclay/logging/log4j2.xml
-    command: ""

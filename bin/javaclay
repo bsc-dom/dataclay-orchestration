@@ -33,13 +33,11 @@ if [ ! -z $PROLOG ]; then
 fi
 #------------------------------------------------------------------------------------------------------
 
-# Compile app and run
-mkdir -p  ${APP_PATH}/bin
-javac -cp ${STUBS_PATH}:${DATACLAY_JAR} $(find $APP_SOURCE -name *.java) -d ${APP_PATH}/bin
-scp -r ${APP_PATH}/bin ${CLIENTNODE}:${APP_PATH}
-echo "$JOB_FOLDER/client exec /home/dataclayusr/dataclay/entrypoints/dataclay-java-entry-point $FLAGS ${@:2}" | ssh "${CLIENTNODE}" bash -s
+scp -r -q ${APP_SOURCE} ${CLIENTNODE}:${APP_PATH}
+echo "$JOB_FOLDER/client exec javac -cp ${STUBS_PATH}:${DATACLAY_JAR} \$(find $APP_PATH -name *.java) -d ${APP_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
+echo "$JOB_FOLDER/client exec /home/dataclayusr/dataclay/entrypoints/dataclay-java-entry-point -cp ${APP_BIN_PATH}:${STUBS_PATH}:${DATACLAY_JAR} $FLAGS ${@:2}" | ssh "${CLIENTNODE}" bash -s
 
 if [ $TRACING == true ]; then 
 	dataclayinfo "Copying traces from ${CLIENTNODE}:${APP_PATH}/trace"
-	scp -r ${CLIENTNODE}:${APP_PATH}/trace .
+	scp -r -q ${CLIENTNODE}:${APP_PATH}/trace .
 fi
