@@ -22,22 +22,18 @@ function create_globaljob_config {
 	echo "export DSNODES=\"$DSNODES\"" >> $GLOBAL_JOB_CONFIG
 	echo "export PYTHON_EE_PER_NODE=$PYTHON_EE_PER_NODE" >> $GLOBAL_JOB_CONFIG
 	echo "export JAVA_EE_PER_NODE=$JAVA_EE_PER_NODE" >> $GLOBAL_JOB_CONFIG	
-	echo "export PROLOG=$PROLOG" >> $GLOBAL_JOB_CONFIG
+	echo "export PROLOG_SCRIPT=$PROLOG_SCRIPT" >> $GLOBAL_JOB_CONFIG
+	echo "export PROLOG_CMD=\"$PROLOG_CMD\"" >> $GLOBAL_JOB_CONFIG
 	echo "export DEBUG=$DEBUG" >> $GLOBAL_JOB_CONFIG
-	echo "export DATACLAY_PROLOGS=$DATACLAY_PROLOGS" >> $GLOBAL_JOB_CONFIG	
-	echo "export DATACLAY_JAR=$DATACLAY_JAR" >> $GLOBAL_JOB_CONFIG
 	echo "export DATACLAY_USR=$DATACLAY_USR" >> $GLOBAL_JOB_CONFIG
 	echo "export DATACLAY_PWD=$DATACLAY_PWD" >> $GLOBAL_JOB_CONFIG
 	echo "export DATACLAY_DATASET=$DATACLAY_DATASET" >> $GLOBAL_JOB_CONFIG
-	echo "export PYTHONPATH=$DATACLAY_PYTHONPATH:\$PYTHONPATH" >> $GLOBAL_JOB_CONFIG
-	echo "export LD_LIBRARY_PATH=$USR_LIB:\$LD_LIBRARY_PATH" >> $GLOBAL_JOB_CONFIG
-	echo "export PATH=$DATACLAY_PATH:\$PATH" >> $GLOBAL_JOB_CONFIG
 }
 
 function set_host_envs {
-	JOB_CONFIG=$DATACLAY_JOB_FOLDER/${DATACLAY_HOST}.config
+	JOB_CONFIG=$DATACLAY_JOB_FOLDER/${SERVICENAME}.config
 	# Do not use DATACLAY_JOB_FOLDER since it is expanding current $HOME and not remote one
-	JOB_FOLDER="\$HOME/.dataClay/$DATACLAY_JOBID/${DATACLAY_HOST}"
+	JOB_FOLDER="\$HOME/.dataClay/$DATACLAY_JOBID/${SERVICENAME}"
 	
 	if [ $LMNODE == "localhost" ] || [ $LMNODE == "127.0.0.1" ]; then 
 		LOGICMODULE_IP=127.0.0.1
@@ -63,7 +59,7 @@ function create_job_config {
 		
 	# Host job config
 	cat $GLOBAL_JOB_CONFIG > $JOB_CONFIG
-	echo "######## $DATACLAY_HOST environment variables ########" >> $JOB_CONFIG
+	echo "######## $SERVICENAME environment variables ########" >> $JOB_CONFIG
 	echo "export TRACING=$TRACING" >> $JOB_CONFIG
 	echo "export JOB_FOLDER=$JOB_FOLDER" >> $JOB_CONFIG
 	echo "export JOB_ENV_FILE=$JOB_ENV_FILE" >> $JOB_CONFIG	
@@ -81,6 +77,16 @@ function create_job_config {
 	echo "export MODEL_BIN_PATH=$MODEL_BIN_PATH" >> $JOB_CONFIG
 	
 	echo "export STUBS_PATH=$STUBS_PATH" >> $JOB_CONFIG
+	
+	echo "export DATACLAY_JAR=$DATACLAY_JAR" >> $JOB_CONFIG
+	echo "export DATACLAY_ENTRYPOINTS=$DATACLAY_ENTRYPOINTS" >> $JOB_CONFIG
+	
+	echo "export PATH=$PATH:\$PATH" >> $JOB_CONFIG
+    echo "export PYTHONPATH=$PYTHONPATH:\$PYTHONPATH" >> $JOB_CONFIG
+    echo "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:\$LD_LIBRARY_PATH" >> $JOB_CONFIG
+    echo "export CLASSPATH=$CLASSPATH:\$CLASSPATH" >> $JOB_CONFIG
+	
+
 	echo "################" >> $JOB_CONFIG
 	
 }
@@ -90,36 +96,43 @@ function create_script {
 	echo "#!/bin/bash" > $SCRIPT_PATH	
 	echo "set -e" >> $SCRIPT_PATH
 	cat $JOB_CONFIG >> $SCRIPT_PATH
-	if [ ! -z $PROLOG ]; then 
-		cat $PROLOG >> $SCRIPT_PATH
+	if [ ! -z "$PROLOG_SCRIPT" ]; then 
+		cat $PROLOG_SCRIPT >> $SCRIPT_PATH
 		printf "\n" >> $SCRIPT_PATH 
 	fi
-	
-	
+	if [ ! -z "$PROLOG_CMD" ]; then 
+		echo $PROLOG_CMD >> $SCRIPT_PATH
+	fi
 }
 
 function generate_env_file {
 	# NOT ALL VARIABLES ARE USED (i.e. logicmodule port just for logicmodule image...)
-
 	SERVICEIDX=$1
-	# Generic vars
+####	 Generic vars
 	ENV_FILE=$JOB_FOLDER/env_"$SERVICEIDX".sh
-	echo "echo \"export PATH=\$PATH:\\\$PATH\" > $ENV_FILE" >> $START_SCRIPT
-    echo "echo \"export PYTHONPATH=\$PYTHONPATH:\\\$PYTHONPATH\" >> $ENV_FILE" >> $START_SCRIPT
-    echo "echo \"export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\\\$LD_LIBRARY_PATH\" >> $ENV_FILE" >> $START_SCRIPT
+	
+	# PATH order: orchestration node path (for propagation), node path, dataclay path 
+	# PYTHONPATH order: orchestration node pythonpath (for propagation), node pythonpath, dataclay pythonpath 
+	# LD_LIBRARY_PATH order: same...
+	echo "echo \"export PATH=\$PATH:$DATACLAY_PATH\" > $ENV_FILE" >> $START_SCRIPT
+    echo "echo \"export PYTHONPATH=\$PYTHONPATH:$DATACLAY_PYTHONPATH\" >> $ENV_FILE" >> $START_SCRIPT
+    echo "echo \"export LD_PRELOAD=$DATACLAY_LD_PRELOAD\" >> $ENV_FILE" >> $START_SCRIPT
+    echo "echo \"export LD_LIBRARY_PATH=$DATACLAY_EXT_BIND:\$LD_LIBRARY_PATH:$DATACLAY_LD_LIBRARY_PATH\" >> $ENV_FILE" >> $START_SCRIPT
+    echo "echo \"export CLASSPATH=\$CLASSPATH:$DATACLAY_CLASSPATH\" >> $ENV_FILE" >> $START_SCRIPT
+    
     echo "echo \"export LOGICMODULE_PORT_TCP=1111\" >> $ENV_FILE " >> $START_SCRIPT
 	echo "echo \"export DATACLAY_ADMIN_USER=admin\" >> $ENV_FILE" >> $START_SCRIPT
 	echo "echo \"export DATACLAY_ADMIN_PASSWORD=admin\" >> $ENV_FILE" >> $START_SCRIPT
 	echo "echo \"export DATACLAYGLOBALCONFIG=$DATACLAYGLOBALCONFIG\" >> $ENV_FILE" >> $START_SCRIPT
-	
-	# DSs
+#	
+####	 DSs	
 	echo "echo \"export DEPLOY_PATH=$DEPLOY_PATH\" >> $ENV_FILE" >> $START_SCRIPT
 	echo "echo \"export DEPLOY_PATH_SRC=$DEPLOY_PATH_SRC\" >> $ENV_FILE" >> $START_SCRIPT
 	echo "echo \"export LOGICMODULE_HOST=$LOGICMODULE_IP\" >> $ENV_FILE" >> $START_SCRIPT
 	echo "echo \"export DATASERVICE_NAME=$DATACLAY_HOST\" >> $ENV_FILE" >> $START_SCRIPT
 	echo "echo \"export DATASERVICE_JAVA_PORT_TCP=$DS_PORT\" >> $ENV_FILE" >> $START_SCRIPT
 	echo "echo \"export DATASERVICE_PYTHON_PORT_TCP=$DS_PORT\" >> $ENV_FILE" >> $START_SCRIPT
-	
+	#echo "echo \"export EXTRAE_CONFIG_FILE=/home/dataclayusr/extrae/extrae_python.xml\" >> $ENV_FILE" >> $START_SCRIPT
 	DS_PORT=`expr $DS_PORT + 1`
 }
 
@@ -164,7 +177,7 @@ function generate_session_properties {
 function link_singularity {
 	#### create link to singularity images for using it in frontend (or for backends without internet access and shared FS)
 	IMAGE=$1
-	SINGULARITY_JOB_FOLDER=$DATACLAY_JOB_FOLDER/$DATACLAY_HOST/images
+	SINGULARITY_JOB_FOLDER=$DATACLAY_JOB_FOLDER/$SERVICENAME/images
 	mkdir -p $SINGULARITY_JOB_FOLDER
 	touch $SINGULARITY_JOB_FOLDER/Singularity
 	ln -s $SINGULARITY_IMAGES_HOME/$IMAGE  $SINGULARITY_JOB_FOLDER/$IMAGE
@@ -174,22 +187,19 @@ function link_singularity {
 
 function deploy { 
 	HOSTNAME=$1
-	DATACLAY_HOST=$2 #node name (logicmodule, DS1, DS2, client,... )
-	SERVICES=(${3}) #services (logicmodule, dsjava, dspython, client) 
-	INSTANCES_PER_SERVICE=(${4}) #number of instances per service
+	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
+	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
+	SERVICE=$4 #service (logicmodule, dsjava, dspython, client) 
 	
-	dataclayecho "Deploying $DATACLAY_HOST to $HOSTNAME..."
+	dataclayecho "Deploying $SERVICENAME to $HOSTNAME..."
 	set_host_envs
 	create_job_config
 		
-	DEPLOY_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${DATACLAY_HOST}_deploy.XXXX)
+	DEPLOY_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${SERVICENAME}_deploy.XXXX)
 	create_script $DEPLOY_SCRIPT 	
 	
 	# link to singularity images in frontend (for shared fs)
-	for SERVICE in ${SERVICES[@]}; do
-		link_singularity ${SERVICE}.sif
-	done
-	
+	link_singularity ${SERVICE}.sif	
 	
 	####### DEPLOY SCRIPT ####### 
 	# prepare paths
@@ -199,46 +209,10 @@ function deploy {
 	echo "mkdir -p $DEPLOY_PATH_SRC" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $STORAGE_PATH" >> $DEPLOY_SCRIPT
 	echo "rm -rf \$HOME/.singularity/instances/logs" >> $DEPLOY_SCRIPT
-		# First generate singularity-compose.yml
-	SINGULARITY_COMPOSE_FILE=/tmp/${DATACLAY_HOST}-singularity-compose.yml
-	
-	cat $SC_TEMPLATES_FOLDER/header.yml > $SINGULARITY_COMPOSE_FILE
-	
-	sed -i "s/dataclayversion/$DATACLAY_VERSION/g" $SINGULARITY_COMPOSE_FILE
-	i=0
-	for SERVICE in ${SERVICES[@]}; do
-		NUM_INSTANCES=${INSTANCES_PER_SERVICE[$i]}
-		for j in $(seq 1 $NUM_INSTANCES); do
-			if [ ${#SERVICES[@]} == 1 ]; then SERVICENAME=${DATACLAY_HOST}_${j}
-			else SERVICENAME=${DATACLAY_HOST}_${SERVICE}_${j}; fi 
-			
-			cat $SC_TEMPLATES_FOLDER/instance.yml >> $SINGULARITY_COMPOSE_FILE
-			sed -i "s/dataclayservice/${SERVICENAME}/g" $SINGULARITY_COMPOSE_FILE
-			sed -i "s/\.\/env\.sh/.\/env_${SERVICENAME}.sh/g" $SINGULARITY_COMPOSE_FILE
-			
-			echo "ln -sf $JOB_FOLDER/images/${SERVICE}.sif $JOB_FOLDER/images/${SERVICENAME}.sif" >> $DEPLOY_SCRIPT
-		done
-		i=$(($i + 1))
-	done
-	
-	sed -i "s/USR_LIB/$SINGULARITY_USR_LIB/g" $SINGULARITY_COMPOSE_FILE
-	sed -i "s/command: \"\"/command: \"$FLAGS\"/g" $SINGULARITY_COMPOSE_FILE
-	
-	# Now cat it to deployment script 
-	echo "echo \"" >> $DEPLOY_SCRIPT
-	cat $SINGULARITY_COMPOSE_FILE >> $DEPLOY_SCRIPT				
-	echo "\" > $JOB_FOLDER/singularity-compose.yml" >> $DEPLOY_SCRIPT
-	rm $SINGULARITY_COMPOSE_FILE
-	
-	echo "rm -rf \$HOME/.singularity/instances/logs/$HOSTNAME" >> $DEPLOY_SCRIPT
-	
-	
-	for SERVICE in ${SERVICES}; do
-		echo "if [ ! -f $JOB_FOLDER/images/Singularity ]; then touch $JOB_FOLDER/images/Singularity; fi" >> $DEPLOY_SCRIPT
-		echo "if [ ! -f $JOB_FOLDER/images/${SERVICE}.sif ]; then
-			singularity pull $JOB_FOLDER/images/${SERVICE}.sif library://support-dataclay/default/${SERVICE}:$DATACLAY_VERSION;
-		fi" >> $DEPLOY_SCRIPT
-	done
+	echo "if [ ! -f $JOB_FOLDER/images/Singularity ]; then touch $JOB_FOLDER/images/Singularity; fi" >> $DEPLOY_SCRIPT
+	echo "if [ ! -f $JOB_FOLDER/images/${SERVICE}.sif ]; then
+		singularity pull $JOB_FOLDER/images/${SERVICE}.sif library://support-dataclay/default/${SERVICE}:$DATACLAY_VERSION;
+	fi" >> $DEPLOY_SCRIPT
 	
 	# Deploy 
 	ssh "${HOSTNAME}" "bash -s" < $DEPLOY_SCRIPT
@@ -252,7 +226,7 @@ function deploy {
 	# Clean temporary scripts
 	rm $DEPLOY_SCRIPT
 	
-	dataclayecho "${DATACLAY_HOST} deployed to $HOSTNAME"
+	dataclayecho "${SERVICENAME} deployed to $HOSTNAME"
 }
 
 
@@ -260,34 +234,42 @@ function deploy {
 
 function start { 
 	HOSTNAME=$1
-	DATACLAY_HOST=$2 #node name (LM, DS1, DS2, CL,... ) #client host must be called CL
-	SERVICES=(${3}) #services (logicmodule, dsjava, dspython, client) 
-	INSTANCES_PER_SERVICE=(${4}) #number of instances per service
+	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
+	SERVICENAME=$3 #service name
+	SERVICE=$4 #service (logicmodule, dsjava, dspython, client) 
 	
 	set_host_envs
 	create_job_config
 
-	START_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${DATACLAY_HOST}_start.XXXX) # i.e. 24000_LM
+	START_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${SERVICENAME}_start.XXXX) # i.e. 24000_LM
 	create_script $START_SCRIPT 
 	
 	# generate global properties 
 	generate_global_properties
 	
-	i=0
-	for SERVICE in ${SERVICES[@]}; do
-		NUM_INSTANCES=${INSTANCES_PER_SERVICE[$i]}
-		for j in $(seq 1 $NUM_INSTANCES); do
-			if [ ${#SERVICES[@]} == 1 ]; then SERVICENAME=${DATACLAY_HOST}_${j}
-			else SERVICENAME=${DATACLAY_HOST}_${SERVICE}_${j}; fi 
-			generate_env_file $SERVICENAME
-		done
-		i=$(($i + 1))
-	done 
-	
+	generate_env_file $SERVICENAME
 	
 	#### TODO: specialize this
 	if [ $SERVICE != "client" ]; then 
-		echo "cd $JOB_FOLDER; singularity-compose up" >> $START_SCRIPT
+		echo "cd $JOB_FOLDER" >> $START_SCRIPT
+		echo "echo \"Starting ${SERVICENAME}\"" >> $START_SCRIPT
+
+		if [ ! -z $EXTRAE_CONFIG_FILE ]; then 
+			# extrae config file is defined 
+			EXTRAE_CONFIG_MOUNT="-B $EXTRAE_CONFIG_FILE:/home/dataclayusr/extrae/extrae_basic.xml"
+		fi
+		DATACLAY_BIND=""
+		if [ ! -z "$DATACLAY_EXT_BIND" ]; then 
+			IFS=':' read -r -a DATACLAY_BIND_ARR <<< "$DATACLAY_EXT_BIND"
+			for MOUNT_POINT in "${DATACLAY_BIND_ARR[@]}"; do
+				DATACLAY_BIND="$DATACLAY_BIND -B $MOUNT_POINT:$MOUNT_POINT"
+			done
+		fi
+		# $EXTRAE_CONFIG_MOUNT -B $USR_LIB:/usr/lib64/ \
+		echo "singularity instance start -B $JOB_FOLDER/cfgfiles/log4j2.xml:/home/dataclayusr/dataclay/logging/log4j2.xml \
+		$DATACLAY_BIND -B $JOB_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh \
+		$JOB_FOLDER/images/${SERVICE}.sif ${SERVICENAME} $FLAGS" >> $START_SCRIPT
+
 	else 
 		if [ ! -f $DATACLAY_JOB_FOLDER/client.config ]; then 
 			# in case client is named differently
@@ -321,19 +303,35 @@ function start {
 function deploy_client {
 	#### SPECIFIC DEPLOYMENT FOR CLIENT NODES #### 
 	HOSTNAME=$1
-	DATACLAY_HOST=$2 #node name (LM, DS1, DS2, client,... )
+	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
+	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
 	
 	set_host_envs
 	create_job_config
 	
-	CLIENT_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${DATACLAY_HOST}_client.XXXX)	
+	CLIENT_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${SERVICENAME}_client.XXXX)	
 	create_script $CLIENT_SCRIPT 		
 	create_job_config
 	
 	####### CLIENT SCRIPT ####### 
 	echo "cd $APP_PATH"  >> $CLIENT_SCRIPT
+	
+	if [ ! -z $EXTRAE_CONFIG_FILE ]; then 
+		# extrae config file is defined 
+		EXTRAE_CONFIG_MOUNT="-B $EXTRAE_CONFIG_FILE:/home/dataclayusr/extrae/extrae_basic.xml"
+	fi
+	DATACLAY_BIND=""
+	if [ ! -z "$DATACLAY_EXT_BIND" ]; then 
+		IFS=':' read -r -a DATACLAY_BIND_ARR <<< "$DATACLAY_EXT_BIND"
+		for MOUNT_POINT in "${DATACLAY_BIND_ARR[@]}"; do
+			DATACLAY_BIND="$DATACLAY_BIND -B $MOUNT_POINT:$MOUNT_POINT"
+		done
+	fi
+		# -B /etc/localtime:/etc/localtime \
+		# $EXTRAE_CONFIG_MOUNT -B $USR_LIB:/usr/lib64/ \
+		
 	echo "singularity \$1 -B $JOB_FOLDER/cfgfiles/log4j2.xml:/home/dataclayusr/dataclay/logging/log4j2.xml \
-		-B $USR_LIB:/usr/lib64/ -B $JOB_FOLDER/env_client_1.sh:/.singularity.d/env/python_env.sh \
+		$DATACLAY_BIND -B $JOB_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh \
 		$JOB_FOLDER/images/client.sif \${@:2}" >> $CLIENT_SCRIPT
 	
 	# Send scripts
@@ -347,34 +345,24 @@ function deploy_client {
 # ===================== STOP SCRIPTS ======================================= #
 function stop { 
 	HOSTNAME=$1
-	DATACLAY_HOST=$2 #node name (LM, DS1, DS2, CL,... )
-	SERVICES=(${3}) #services (logicmodule, dsjava, dspython, client) 
-	INSTANCES_PER_SERVICE=(${4}) #number of instances per service
+	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
+	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
+	SERVICE=$4 #service (logicmodule, dsjava, dspython, client) 
 	
 	set_host_envs
 	create_job_config
 	
-	dataclayecho "Stopping ${DATACLAY_HOST} at $HOSTNAME"
-	STOP_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${DATACLAY_HOST}_stop.XXXX)
+	dataclayecho "Stopping ${SERVICENAME} at $HOSTNAME"
+	STOP_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${SERVICENAME}_stop.XXXX)
 	create_script $STOP_SCRIPT
 	
-	i=0
-	for SERVICE in ${SERVICES[@]}; do
-		NUM_INSTANCES=${INSTANCES_PER_SERVICE[$i]}
-		for j in $(seq 1 $NUM_INSTANCES); do
-			if [ ${#SERVICES[@]} == 1 ]; then SERVICENAME=${DATACLAY_HOST}_${j}
-			else SERVICENAME=${DATACLAY_HOST}_${SERVICE}_${j}; fi 
-			SIGNAL="SIGTERM"
-			if [ $SERVICE == "dspython" ]; then 
-				SIGNAL="SIGINT"
-			fi 
-			echo "if singularity instance list | grep $SERVICENAME; then" >>  $STOP_SCRIPT
-			echo "singularity instance stop -s $SIGNAL -t $SHUTDOWN_TIMEOUT $SERVICENAME" >> $STOP_SCRIPT
-			echo "fi" >> $STOP_SCRIPT
-		done
-		i=$(($i + 1))
-	done
-	
+	SIGNAL="SIGTERM"
+	if [ $SERVICE == "dspython" ]; then 
+		SIGNAL="SIGINT"
+	fi 
+	echo "if singularity instance list | grep $SERVICENAME; then" >>  $STOP_SCRIPT
+	echo "singularity instance stop -s $SIGNAL -t $SHUTDOWN_TIMEOUT $SERVICENAME" >> $STOP_SCRIPT
+	echo "fi" >> $STOP_SCRIPT
 
 	# Send scripts
 	echo "mkdir -p $JOB_FOLDER" | ssh "${HOSTNAME}" bash -s #sanity check
@@ -390,10 +378,8 @@ function stop {
 
 function clean { 
 	HOSTNAME=$1
-	DATACLAY_HOST=$2 #node name (LM, DS1, DS2, CL,... )
-	SERVICES=(${3}) #services (logicmodule, dsjava, dspython, client) 
-	INSTANCES_PER_SERVICE=(${4}) #number of instances per service
-	
+	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
+	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
 	set_host_envs
 	echo "rm -rf $JOB_FOLDER" | ssh "${HOSTNAME}" bash -s
 }
@@ -423,31 +409,52 @@ function dataclaydeploy {
 	fi
 	create_globaljob_config
 
-	deploy $LMNODE ${LM_HOSTID} "logicmodule"
+	deploy $LMNODE ${LM_HOSTID} logicmodule logicmodule 
 	i=1
 	for NODE in $DSNODES; do
-		deploy $NODE ${DSNAME_PREFIX}${i} "dsjava dspython" "$JAVA_EE_PER_NODE $PYTHON_EE_PER_NODE"
+		for j in $(seq 1 $JAVA_EE_PER_NODE); do
+			SERVICENAME=dsjava${i}_${j}
+			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava
+		done 
+		for j in $(seq 1 $PYTHON_EE_PER_NODE); do
+			SERVICENAME=dspython${i}_${j}
+			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython
+		done
 		i=$(($i + 1))
 	done
-	deploy $CLIENTNODE ${CLIENT_HOSTID} "client"
-	deploy_client $CLIENTNODE ${CLIENT_HOSTID}
+	deploy $CLIENTNODE ${CLIENT_HOSTID} client client
+	deploy_client $CLIENTNODE ${CLIENT_HOSTID} client
 	
 	echo "$DATACLAY_JOBID" >> $DEPLOYED_DATACLAY_JOBS
 	dataclayinfo "========== dataClay deployed! =========="
 }
 
 function dataclaystart { 
+
+	if [ "$DEPLOYED" == false ]; then 
+		dataclaydeploy
+	else 
+		dataclayinfo "INFO: Already deployed dataClay found."
+	fi
+
 	dataclayinfo "========== Starting dataClay ========== "
 
 	# Get client config to get DS nodes and LM node
 	source $GLOBAL_JOB_CONFIG
-	start $LMNODE ${LM_HOSTID} "logicmodule"
+	start $LMNODE ${LM_HOSTID} logicmodule logicmodule
 	i=1
 	for NODE in $DSNODES; do
-		start $NODE ${DSNAME_PREFIX}${i} "dsjava dspython" "$JAVA_EE_PER_NODE $PYTHON_EE_PER_NODE"
+		for j in $(seq 1 $JAVA_EE_PER_NODE); do
+			SERVICENAME=dsjava${i}_${j}
+			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava
+		done 
+		for j in $(seq 1 $PYTHON_EE_PER_NODE); do
+			SERVICENAME=dspython${i}_${j}
+			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython 
+		done
 		i=$(($i + 1))
 	done
-	start $CLIENTNODE ${CLIENT_HOSTID} "client"
+	start $CLIENTNODE ${CLIENT_HOSTID} client client
 	
 	############ VERIFY ############ 
 	# Wait for dataClay to be read
@@ -474,6 +481,7 @@ function dataclaystart {
 }
 
 function dataclaystop { 
+	
 	dataclayinfo "========== Stopping dataClay ========== "
 
 	# ------------------------------ dataClay Job configuration -------------------------------------------
@@ -483,10 +491,18 @@ function dataclaystop {
 	#------------------------------------------------------------------------------------------------------
 	i=1
 	for NODE in $DSNODES; do
-		stop $NODE ${DSNAME_PREFIX}${i} "dsjava dspython" "$JAVA_EE_PER_NODE $PYTHON_EE_PER_NODE"
+		#### NOTE: stop first dspython
+		for j in $(seq 1 $PYTHON_EE_PER_NODE); do
+			SERVICENAME=dspython${i}_${j}
+			stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython
+		done
+		for j in $(seq 1 $JAVA_EE_PER_NODE); do
+			SERVICENAME=dsjava${i}_${j}
+			stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava
+		done 
 		i=$(($i + 1))
 	done
-	stop $LMNODE ${LM_HOSTID} "logicmodule"
+	stop $LMNODE ${LM_HOSTID} logicmodule logicmodule
 	
 	dataclayinfo "========== dataClay stopped! ========== "
 }
@@ -502,23 +518,32 @@ function dataclayclean {
 	echo "$PPID=$DATACLAY_JOBID" >> $DATACLAY_JOB_PIDS
 		
 	if [ -d $DATACLAY_JOB_FOLDER ]; then
+		CLEAN=true
 		dataclaystop
 		i=1
 		for NODE in $DSNODES; do
-			clean $NODE ${DSNAME_PREFIX}${i} "dsjava dspython" "$JAVA_EE_PER_NODE $PYTHON_EE_PER_NODE"
+			for j in $(seq 1 $PYTHON_EE_PER_NODE); do
+				SERVICENAME=dspython${i}_${j}
+				clean $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython
+			done
+			for j in $(seq 1 $JAVA_EE_PER_NODE); do
+				SERVICENAME=dsjava${i}_${j}
+				clean $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava
+			done 
 			i=$(($i + 1))
 		done
-		clean $LMNODE ${LM_HOSTID} "logicmodule"
-		clean $CLIENTNODE ${CLIENT_HOSTID} "client"
+		clean $LMNODE ${LM_HOSTID} logicmodule logicmodule
+		clean $CLIENTNODE ${CLIENT_HOSTID} client client
 		rm -rf $DATACLAY_JOB_FOLDER
 	fi
 		
 	# stop all remaining instances in current node (for localhost) 
-	INSTANCES=$(singularity instance list | awk '{if(NR>1)print $1}')
-	for INSTANCE in $INSTANCES; do
-		dataclaywarn "Found orphan instance $INSTANCE. Killing..."
-		singularity instance stop -s SIGKILL $INSTANCE
-	done 
+	# if singularity is installed locally: 
+	if hash singularity 2>/dev/null; then
+		if [[ $(singularity instance list | wc -l) -gt 1 ]]; then 
+			singularity instance stop -a	
+		fi
+	fi
 	
 	dataclayinfo "========== dataClay cleaned! ========== "
 	
@@ -541,31 +566,37 @@ elif [ "$1" == "restart" ]; then
 else
 	dataclayerr "First argument must be start or stop"
 fi 
-# Check DATACLAY_HOME is set 
+# Check DATACLAY_BASE is set 
 SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-DATACLAY_HOME=$SCRIPTDIR/..
-#if [ -z $DATACLAY_HOME ]; then
-#        dataclayerr "Please set DATACLAY_HOME in your host (via bashrc, ...)!"
+DATACLAY_BASE=$SCRIPTDIR/..
+#if [ -z $DATACLAY_BASE ]; then
+#        dataclayerr "Please set DATACLAY_BASE in your host (via bashrc, ...)!"
 #fi 
 if [ ! -d $HOME/.dataClay ]; then
 	dataclaywarn "Creating $HOME/.dataClay folder." 
 	mkdir $HOME/.dataClay 
 fi
-DATACLAY_VERSION=$(cat $DATACLAY_HOME/VERSION.txt)
+DATACLAY_VERSION=$(cat $DATACLAY_BASE/VERSION.txt)
 DATACLAY_JOB_PIDS=$HOME/.dataClay/job.pids
 DEPLOYED_DATACLAY_JOBS=$HOME/.dataClay/deployed.jobs
 
 ### PREPARE ###
 if [ ! -f $DATACLAY_JOB_PIDS ]; then touch $DATACLAY_JOB_PIDS; fi
 if [ ! -f $DEPLOYED_DATACLAY_JOBS ]; then touch $DEPLOYED_DATACLAY_JOBS; fi
- 
-ID=$($SCRIPTDIR/dataclayid $PPID)
 
-# if ID exists, set it 
-if [ ! -z $ID ]; then
-	export DATACLAY_JOBID=$ID
-    dataclaywarn "Found current process $PPID using DATACLAY_JOBID"
+if [ ! -z $SLURM_JOBID ]; then 
+	export DATACLAY_JOBID=$SLURM_JOBID
+    dataclaywarn "SLURM JOB ID detected. Using it. DATACLAY_JOBID = $DATACLAY_JOBID"
 fi
+
+if [ -z $DATACLAY_JOBID ]; then
+	ID=$($SCRIPTDIR/dataclayid $PPID)
+	# if ID exists, set it 
+	if [ ! -z $ID ]; then
+		export DATACLAY_JOBID=$ID
+    	dataclaywarn "Found current process $PPID using DATACLAY_JOBID"
+	fi
+fi 
 
 # Check DATACLAY_JOBID is set 
 if [ -z $DATACLAY_JOBID ]; then
@@ -603,7 +634,6 @@ shift
 # global vars
 DATACLAY_JOB_FOLDER="$HOME/.dataClay/$DATACLAY_JOBID"
 GLOBAL_JOB_CONFIG=$DATACLAY_JOB_FOLDER/job.config
-DATACLAY_PROLOGS=$DATACLAY_HOME/prolog
 CLIENT_HOSTID="client"
 LM_HOSTID="logicmodule"
 DSNAME_PREFIX="dataservice"
@@ -611,24 +641,32 @@ DATACLAY_USR=bsc_user
 DATACLAY_PWD=bsc_user
 DATACLAY_DATASET=bsc_dataset
 PYTHON_VERSION=3.7
-DATACLAY_JAR="/home/dataclayusr/dataclay/dataclay.jar"
-DATACLAY_PYTHONPATH="/home/dataclayusr/dataclay/dataclay_venv/lib/python${PYTHON_VERSION}/site-packages/"
-DATACLAY_PYTHONPATH="$DATACLAY_PYTHONPATH:/home/dataclayusr/dataclay/dataclay_venv/lib/python${PYTHON_VERSION}"
 if [ -d "/usr/lib64" ]; then 
 	USR_LIB="/usr/lib64/"
 else 
 	USR_LIB="/usr/lib/"
 fi
-SINGULARITY_USR_LIB="\/usr\/lib\/"
-DATACLAY_PATH="${DATACLAY_HOME}/bin"
+DATACLAY_PATH="${DATACLAY_BASE}/bin"
 JAVA_EE_PER_NODE=1
 PYTHON_EE_PER_NODE=1
 DS_PORT=2222
-SINGULARITY_IMAGES_HOME=$DATACLAY_HOME/singularity/images/
-LOG4J_CONFIG=$DATACLAY_HOME/logging/info.xml
+SINGULARITY_IMAGES_HOME=$DATACLAY_BASE/singularity/images/
+LOG4J_CONFIG=$DATACLAY_BASE/logging/info.xml
 DEBUG=False
-SC_TEMPLATES_FOLDER=$DATACLAY_HOME/singularity/singularity-compose-templates
 HOSTS="localhost localhost localhost" 
+
+#### DATACLAY ENV. VARIABLES THAT MIGHT BE AFFECTED BY HOST ENVIRONMENT #####
+### WARNING: THESE VARIABLES ARE DEFINED IN DOCKERFILES 
+DATACLAY_JAR="/home/dataclayusr/dataclay/dataclay.jar"
+DATACLAY_ENTRYPOINTS="/home/dataclayusr/dataclay/entrypoints"
+DATACLAY_VIRTUALENV="/home/dataclayusr/dataclay/dataclay_venv"
+DATACLAY_EXTRAE_HOME="/home/dataclayusr/.extrae/"
+DATACLAY_PATH="${DATACLAY_VIRTUALENV}/bin:${DATACLAY_ENTRYPOINTS}:${DATACLAY_EXTRAE_HOME}/bin"
+DATACLAY_PYTHONPATH="${DATACLAY_EXTRAE_HOME}/libexec:${DATACLAY_EXTRAE_HOME}/lib:${DATACLAY_VIRTUALENV}/lib/python${PYTHON_VERSION}/site-packages"
+DATACLAY_LD_LIBRARY_PATH="${DATACLAY_EXTRAE_HOME}/lib"
+DATACLAY_LD_PRELOAD="${DATACLAY_EXTRAE_HOME}/lib/libpttrace.so"
+DATACLAY_CLASSPATH="${DATACLAY_JAR}"
+###############################################################
 
 # Start args
 TRACING=false
@@ -642,7 +680,7 @@ SHUTDOWN_TIMEOUT=300
 while test $# -gt 0
 do
 	case "$1" in
-			--python_ee_per_node) 
+			--python-ee-per-node) 
 		    	shift 
 		    	PYTHON_EE_PER_NODE=$1
 	            dataclayecho "- setting python execution environment per node = $PYTHON_EE_PER_NODE"
@@ -651,10 +689,15 @@ do
 		   		shift
 		    	HOSTS=$1
 	            ;;
-	        --prolog) 
+	        --prolog-cmd) 
 	        	shift
-	        	PROLOG=$1
-	            dataclayecho "- setting prolog = $PROLOG"
+	        	PROLOG_CMD=$1
+	            dataclayecho "- setting prolog command = $PROLOG_CMD"
+	        	;;
+	        --prolog-script) 
+	        	shift
+	        	PROLOG_SCRIPT=$1
+	            dataclayecho "- setting prolog script = $PROLOG_SCRIPT"
 	        	;;
 	        --globalprops) 
 	        	shift 
@@ -667,7 +710,7 @@ do
 	        	;;
 	        --debug) 
 	            FLAGS="$FLAGS $1"
-	            LOG4J_CONFIG=$DATACLAY_HOME/logging/debug.xml
+	            LOG4J_CONFIG=$DATACLAY_BASE/logging/debug.xml
 	            DEBUG=True
 	            dataclayecho "- debug mode: enabled "
 	            ;; 
@@ -679,7 +722,7 @@ do
 			--shutdown-timeout)
 		    	shift
 		    	SHUTDOWN_TIMEOUT=$1
-		    	dataclayecho "- shutdown timeou = $TIMEOUT"
+		    	dataclayecho "- shutdown timeout = $SHUTDOWN_TIMEOUT"
 	            ;;
 			--*) 
 				dataclayerr "Wrong option $1 provided" 
@@ -691,21 +734,8 @@ do
     shift
 done
 
-# if prolog is relative, check if exists in prolog folder 
-if [ ! -z $PROLOG ]; then 
-	if [[ $PROLOG != /* ]]; then 
-		PROLOG=$DATACLAY_PROLOGS/$PROLOG
-	fi
-fi
-
-if [ ! -f $PROLOG ]; then 
-	dataclayerr "Prolog $PROLOG not found. Remember to provide absolute path for custom prologs."
-fi
-
-if [ "$DEPLOYED" == false ]; then 
-	dataclaydeploy
-else 
-	dataclayinfo "INFO: Already deployed dataClay found."
+if [ ! -f $PROLOG_SCRIPT ]; then 
+	dataclayerr "Prolog $PROLOG_SCRIPT not found."
 fi
 
 if [ "$START" == true ]; then 

@@ -16,6 +16,10 @@ if [[ $APP_MAIN == /* ]]; then
     dataclayerr "Main class path must be relative. Found ${APP_MAIN}" 
 fi
 # ------------------------------ dataClay Job configuration -------------------------------------------
+if [ ! -z $SLURM_JOBID ]; then 
+	export DATACLAY_JOBID=$SLURM_JOBID
+    dataclaywarn "SLURM JOB ID detected. Using it. DATACLAY_JOBID = $DATACLAY_JOBID"
+fi
 if [ -z $DATACLAY_JOBID ]; then 
 	ID=$(dataclayid $PPID)
 	if [ ! -z $ID ]; then export DATACLAY_JOBID=$ID; fi
@@ -33,7 +37,7 @@ fi
 
 #------------------------------------------------------------------------------------------------------
 scp -r -q ${APP_SOURCE} ${CLIENTNODE}:${APP_PATH}
-echo "$JOB_FOLDER/client exec /home/dataclayusr/dataclay/entrypoints/dataclay-python-entry-point $FLAGS ${@:2}" | ssh "${CLIENTNODE}" bash -s
+echo "$JOB_FOLDER/client exec ${DATACLAY_ENTRYPOINTS}/dataclay-python-entry-point $FLAGS ${@:2}" | ssh "${CLIENTNODE}" bash -s
 
 if [ $TRACING == true ]; then 
 	dataclayinfo "Copying traces from ${CLIENTNODE}:${APP_PATH}/trace"

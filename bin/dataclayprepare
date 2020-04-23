@@ -10,8 +10,9 @@ declare -a ARGS
 while test $# -gt 0
 do
 	case "$1" in
-			--marenostrum) 
-		    	export DATACLAY_JOBID=$SLURM_JOBID
+			--jobid)
+				shift 
+		    	export DATACLAY_JOBID=$1
 	            dataclayecho "- provided job id = $DATACLAY_JOBID"
 		    	;;
 			--*) 
@@ -44,6 +45,10 @@ if [ ! -d $MODELSRCPATH ]; then
 fi
 
 # ------------------------------ dataClay Job configuration -------------------------------------------
+if [ ! -z $SLURM_JOBID ]; then 
+	export DATACLAY_JOBID=$SLURM_JOBID
+    dataclaywarn "SLURM JOB ID detected. Using it. DATACLAY_JOBID = $DATACLAY_JOBID"
+fi
 if [ -z $DATACLAY_JOBID ]; then 
 	ID=$(dataclayid $PPID)
 	if [ ! -z $ID ]; then export DATACLAY_JOBID=$ID; fi
@@ -71,7 +76,7 @@ dataclay NewDataContract ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_DATASET} ${D
 if [ $LANGUAGE == "java" ]; then 
 	# Compile classes 
 	scp -q -r ${MODELSRCPATH} ${CLIENTNODE}:${MODEL_PATH}
-	echo "$JOB_FOLDER/client exec javac -cp ${DATACLAY_JAR} \$(find ${MODEL_PATH} -name *.java) -d ${MODEL_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
+	echo "$JOB_FOLDER/client exec javac \$(find ${MODEL_PATH} -name *.java) -d ${MODEL_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
 else 
 	scp -q -r ${MODELSRCPATH}/* ${CLIENTNODE}:${MODEL_BIN_PATH}
 fi 
