@@ -76,7 +76,7 @@ dataclay NewDataContract ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_DATASET} ${D
 if [ $LANGUAGE == "java" ]; then 
 	# Compile classes 
 	scp -q -r ${MODELSRCPATH} ${CLIENTNODE}:${MODEL_PATH}
-	echo "$JOB_FOLDER/client exec javac \$(find ${MODEL_PATH} -name *.java) -d ${MODEL_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
+	echo "$SERVICE_FOLDER/client exec javac -source $DATACLAY_JAVA_VERSION -target $DATACLAY_JAVA_VERSION \$(find ${MODEL_PATH} -name *.java) -d ${MODEL_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
 else 
 	scp -q -r ${MODELSRCPATH}/* ${CLIENTNODE}:${MODEL_BIN_PATH}
 fi 

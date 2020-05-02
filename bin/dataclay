@@ -11,4 +11,4 @@ fi
 JOB_CONFIG="$HOME/.dataClay/$DATACLAY_JOBID/client.config"
 source $JOB_CONFIG
 #------------------------------------------------------------------------------------------------------
-echo "$JOB_FOLDER/client run ${@}" | ssh "${CLIENTNODE}" bash -s
+echo "$SERVICE_FOLDER/client run ${@}" | ssh "${CLIENTNODE}" bash -s

@@ -37,7 +37,7 @@ fi
 
 #------------------------------------------------------------------------------------------------------
 scp -r -q ${APP_SOURCE} ${CLIENTNODE}:${APP_PATH}
-echo "$JOB_FOLDER/client exec ${DATACLAY_ENTRYPOINTS}/dataclay-python-entry-point $FLAGS ${@:2}" | ssh "${CLIENTNODE}" bash -s
+echo "$SERVICE_FOLDER/client exec ${CONTAINER_ENTRYPOINTS}/dataclay-python-entry-point $FLAGS ${@:2}" | ssh "${CLIENTNODE}" bash -s
 
 if [ $TRACING == true ]; then 
 	dataclayinfo "Copying traces from ${CLIENTNODE}:${APP_PATH}/trace"
