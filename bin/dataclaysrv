@@ -107,7 +107,8 @@ function create_service_config {
 	## Extrae
 	#echo "echo \"export EXTRAE_CONFIG_FILE=/home/dataclayusr/extrae/extrae_python.xml\" >> $ENV_FILE" >> $RUN_SCRIPT
 	echo "export EXTRAE_SKIP_AUTO_LIBRARY_INITIALIZE=1"  >> $SERVICE_CONFIG
-	echo "export DATACLAY_EXTRAE_WRAPPER_LIB=$DATACLAY_EXTRAE_WRAPPER_LIB" >> $SERVICE_CONFIG
+	echo "export PYCLAY_EXTRAE_WRAPPER_LIB=$PYCLAY_EXTRAE_WRAPPER_LIB" >> $SERVICE_CONFIG
+	echo "export JAVACLAY_EXTRAE_WRAPPER_LIB=$JAVACLAY_EXTRAE_WRAPPER_LIB" >> $SERVICE_CONFIG
 
 	DS_PORT=`expr $DS_PORT + 1`
 	
@@ -174,9 +175,10 @@ function generate_session_properties {
     echo "echo \"DataSets=$DATACLAY_DATASET\" >> $DATACLAYSESSIONCONFIG" >> $RUN_SCRIPT
     echo "echo \"DataClayGlobalConfig=$DATACLAYGLOBALCONFIG\" >> $DATACLAYSESSIONCONFIG" >> $RUN_SCRIPT
 	if [ "$TRACING" = true ] ; then
+    	echo "echo \"ExtraeStartingTaskID=$EXTRAE_STARTING_TASK_ID\" >> $DATACLAYSESSIONCONFIG" >> $RUN_SCRIPT
     	echo "echo \"Tracing=True\" >> $DATACLAYSESSIONCONFIG" >> $RUN_SCRIPT
-    	echo "echo \"DataClayExtraeWrapperLib=$DATACLAY_EXTRAE_WRAPPER_LIB\" >> $DATACLAYSESSIONCONFIG" >> $RUN_SCRIPT
-    	
+    	echo "echo \"pyClayExtraeWrapperLib=$PYCLAY_EXTRAE_WRAPPER_LIB\" >> $DATACLAYSESSIONCONFIG" >> $RUN_SCRIPT
+    	echo "echo \"javaClayExtraeWrapperLib=$JAVACLAY_EXTRAE_WRAPPER_LIB\" >> $DATACLAYSESSIONCONFIG" >> $RUN_SCRIPT
 	fi
 }
 
@@ -661,6 +663,7 @@ DATACLAY_PYTHON_VERSION=3.7
 JAVA_CONTAINER_SUFFIX=$(get_container_version jdk$DATACLAY_JAVA_VERSION)
 PYTHON_CONTAINER_SUFFIX=$(get_container_version py$DATACLAY_PYTHON_VERSION)
 SHARED_FS=FALSE
+EXTRAE_STARTING_TASK_ID=0
 JAVA_EE_PER_NODE=1
 PYTHON_EE_PER_NODE=1
 DS_PORT=2222
@@ -675,7 +678,8 @@ CONTAINER_DATACLAY_JAR="/home/dataclayusr/dataclay/dataclay.jar"
 CONTAINER_ENTRYPOINTS="/home/dataclayusr/dataclay/entrypoints"
 CONTAINER_VIRTUALENV="/home/dataclayusr/dataclay/dataclay_venv"
 CONTAINER_EXTRAE_HOME="/home/dataclayusr/.extrae/"
-CONTAINER_DATACLAY_EXTRAE_WRAPPER_LIB="/home/dataclayusr/dataclay/pyextrae/dataclay_extrae_wrapper.so"
+CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB="/home/dataclayusr/dataclay/pyextrae/pyclay_extrae_wrapper.so"
+CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB="/home/dataclayusr/dataclay/javaextrae/javaclay_extrae_wrapper.so"
 CONTAINER_PATH="${CONTAINER_VIRTUALENV}/bin:${CONTAINER_ENTRYPOINTS}:${CONTAINER_EXTRAE_HOME}/bin"
 CONTAINER_PYCLAY_PATH="${CONTAINER_VIRTUALENV}/lib/python${DATACLAY_PYTHON_VERSION}/site-packages"
 CONTAINER_PYTHONPATH="${CONTAINER_PYCLAY_PATH}:${CONTAINER_EXTRAE_HOME}/libexec:${CONTAINER_EXTRAE_HOME}/lib"
@@ -706,7 +710,9 @@ fi
 ###############################################################
 # Extrae 
 
-DATACLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_DATACLAY_EXTRAE_WRAPPER_LIB
+PYCLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB
+JAVACLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB
+
 ###############################################################
 
 # Start args
@@ -750,10 +756,20 @@ do
 		    	dataclayecho "- selected java version = $DATACLAY_JAVA_VERSION"
 		    	dataclayecho "- java container suffix will be = $JAVA_CONTAINER_SUFFIX"
 		    	;;
-		    --dataclay-extrae-wrapper) 
+		    --pyclay-extrae-wrapper) 
 		    	shift
-		    	DATACLAY_EXTRAE_WRAPPER_LIB=$1
-		    	dataclayecho "- using extrae wrapper = $DATACLAY_EXTRAE_WRAPPER_LIB"
+		    	PYCLAY_EXTRAE_WRAPPER_LIB=$1
+		    	dataclayecho "- using extrae wrapper = $PYCLAY_EXTRAE_WRAPPER_LIB"
+		    	;;
+		    --javaclay-extrae-wrapper) 
+		    	shift
+		    	JAVACLAY_EXTRAE_WRAPPER_LIB=$1
+		    	dataclayecho "- using extrae wrapper = $JAVACLAY_EXTRAE_WRAPPER_LIB"
+		    	;;
+		    --extrae-starting-task-id)
+		     	shift
+		    	EXTRAE_STARTING_TASK_ID=$1
+		    	dataclayecho "- using extrae starting task id = $EXTRAE_STARTING_TASK_ID"
 		    	;;
 		    --sharedfs) 
 		    	SHARED_FS=true
