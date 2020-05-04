@@ -105,7 +105,7 @@ function create_service_config {
 	echo "export DATASERVICE_PYTHON_PORT_TCP=$DS_PORT" >> $SERVICE_CONFIG
 	
 	## Extrae
-	#echo "echo \"export EXTRAE_CONFIG_FILE=/home/dataclayusr/extrae/extrae_python.xml\" >> $ENV_FILE" >> $RUN_SCRIPT
+	echo "export EXTRAE_CONFIG_FILE=$EXTRAE_CONFIG_FILE" >> $SERVICE_CONFIG
 	echo "export EXTRAE_SKIP_AUTO_LIBRARY_INITIALIZE=1"  >> $SERVICE_CONFIG
 	echo "export PYCLAY_EXTRAE_WRAPPER_LIB=$PYCLAY_EXTRAE_WRAPPER_LIB" >> $SERVICE_CONFIG
 	echo "export JAVACLAY_EXTRAE_WRAPPER_LIB=$JAVACLAY_EXTRAE_WRAPPER_LIB" >> $SERVICE_CONFIG
@@ -687,6 +687,7 @@ CONTAINER_LD_LIBRARY_PATH="${CONTAINER_EXTRAE_HOME}/lib"
 CONTAINER_LD_PRELOAD="${CONTAINER_EXTRAE_HOME}/lib/libpttrace.so"
 CONTAINER_CLASSPATH="${CONTAINER_DATACLAY_JAR}"
 CONTAINER_EXTRAE_SKIP_AUTO_LIBRARY_INITIALIZE=1
+CONTAINER_EXTRAE_CONFIG_FILE="/home/dataclayusr/dataclay/extrae/extrae_basic.xml"
 ###############################################################
 
 
@@ -712,7 +713,7 @@ fi
 
 PYCLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB
 JAVACLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB
-
+EXTRAE_CONFIG_FILE=$CONTAINER_EXTRAE_CONFIG_FILE
 ###############################################################
 
 # Start args
@@ -770,6 +771,11 @@ do
 		     	shift
 		    	EXTRAE_STARTING_TASK_ID=$1
 		    	dataclayecho "- using extrae starting task id = $EXTRAE_STARTING_TASK_ID"
+		    	;;
+		    --extrae-config-file) 
+		    	shift 
+		    	EXTRAE_CONFIG_FILE=$1 
+		    	dataclayecho "- using extrae configuration file at $EXTRAE_CONFIG_FILE" 
 		    	;;
 		    --sharedfs) 
 		    	SHARED_FS=true

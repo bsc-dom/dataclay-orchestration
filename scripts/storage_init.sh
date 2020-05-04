@@ -102,6 +102,7 @@ if [[ $DATACLAYSRV_START_CMD == *"--tracing"* ]]; then
 	IFS=' ' read -r -a HOSTS_ARRAY <<< "$HOSTS"
 	COUNT=${#HOSTS_ARRAY[@]}
 	DATACLAYSRV_START_CMD="--extrae-starting-task-id $COUNT $DATACLAYSRV_START_CMD"
+    DATACLAYSRV_START_CMD="--extrae-config-file /apps/DATACLAY/$DATACLAY_VERSION/extrae/extrae_basic.xml $DATACLAYSRV_START_CMD"
 fi
 
 dataclaysrv start --hosts "$HOSTS" $DATACLAYSRV_START_CMD
