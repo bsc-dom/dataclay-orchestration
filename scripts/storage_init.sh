@@ -60,9 +60,11 @@ if [ "${network}" == "infiniband" ]; then
 fi
 
 #----------------------------------------- SLURM -------------------------------------------------
-HOSTS="$storage_master_node $worker_nodes"
+COMPSS_HOSTS="$storage_master_node $worker_nodes"
+JOB_HOSTS=($(echo $COMPSS_HOSTS | tr " " "\n"))
+HOSTS=""
 # Get hosts and add infiniband suffix if needed
-for HOST in $JOB_HOSTS; do
+for HOST in ${JOB_HOSTS[@]}; do
         HOSTS="$HOSTS ${HOST}${NETWORK_SUFFIX}"
 done
 export DATACLAY_JOBID=$jobId
