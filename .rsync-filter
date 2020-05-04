@@ -1,0 +1,11 @@
+- *.pyc
+- *.pyo
+- __pycache__/
+- .gitignore
+- /.idea/
+- /.vscode/
+- /.pyenv*/
+- /venv/
+- .dockerignore
+- *latest*
+- *_pb2*

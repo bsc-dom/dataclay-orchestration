@@ -1,5 +1,4 @@
 #!/bin/bash
-echo "Starting init of dataClay [@storage_init.sh]"
 #############################################################
 # Name: storage_init.sh
 # Description: Storage API script for COMPSs
@@ -69,12 +68,50 @@ done
 export DATACLAY_JOBID=$jobId
 #---------------------------------------- Start dataClay ----------------------------------------------
 source $storageProps
+
+# Get version
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+DATACLAY_BASE=$SCRIPTDIR/..
+DATACLAY_VERSION=$(cat $DATACLAY_BASE/VERSION.txt)
+
+# Specify python virtual environment 
+PYTHONVERSION=$(python --version | awk '{print $2}')
+SIMPLIFIED_PYTHONVERSION=$( cut -d '.' -f 1,2 <<< "$PYTHONVERSION" )
+
+echo "[@storage_init.sh] Initializing dataClay $DATACLAY_VERSION"
+echo "[@storage_init.sh] INFO: Found Python version $PYTHONVERSION "
+
+DATACLAYSRV_START_CMD="--container-python-version $SIMPLIFIED_PYTHONVERSION $DATACLAYSRV_START_CMD" # server will use this python version singularity image
+DATACLAYSRV_START_CMD="--pyclay-path $PYCLAY_PATH $DATACLAYSRV_START_CMD"
+DATACLAYSRV_START_CMD="--javaclay-path $DATACLAY_JAR $DATACLAYSRV_START_CMD"
+DATACLAY_COMPSS_EXTRAE_VERSION=3.5.3
+
+# Specify extrae wrapper 
+if [[ $DATACLAYSRV_START_CMD == *"--tracing"* ]]; then
+	if [ -z $EXTRAE_HOME ]; then 
+		EXTRAE_VERSION=$DATACLAY_COMPSS_EXTRAE_VERSION
+	else 
+		EXTRAE_VERSION=$(echo "${EXTRAE_HOME//\/apps\/BSCTOOLS\/extrae\//}" | awk -F "/" '{print $1}')
+		echo " [@storage_init.sh] **** Warning **** Found Extrae version $EXTRAE_VERSION "
+	fi
+	echo "[@storage_init.sh] INFO: Using Extrae version $EXTRAE_VERSION "
+	DATACLAYSRV_START_CMD="--pyclay-extrae-wrapper /apps/DATACLAY/dependencies/extrae_wrapper/lib/pyextrae/pyclay_extrae_wrapper${EXTRAE_VERSION}.so $DATACLAYSRV_START_CMD"
+	DATACLAYSRV_START_CMD="--javaclay-extrae-wrapper /apps/DATACLAY/dependencies/extrae_wrapper/lib/javaextrae/javaclay_extrae_wrapper${EXTRAE_VERSION}.so $DATACLAYSRV_START_CMD"
+	IFS=' ' read -r -a HOSTS_ARRAY <<< "$HOSTS"
+	COUNT=${#HOSTS_ARRAY[@]}
+	DATACLAYSRV_START_CMD="--extrae-starting-task-id $COUNT $DATACLAYSRV_START_CMD"
+fi
+
 dataclaysrv start --hosts "$HOSTS" $DATACLAYSRV_START_CMD
+
 #-------------------------------------- COMPSs specifc -------------------------------------------------
 # Get session config
 JOB_CONFIG="$HOME/.dataClay/$DATACLAY_JOBID/client.config"
 source $JOB_CONFIG
 
-echo "Symbolic linking $DATACLAYSESSIONCONFIG to COMPSs folder"
+echo "[@storage_init.sh] Symbolic linking $DATACLAYSESSIONCONFIG to COMPSs folder"
 mkdir -p ~/.COMPSs/${jobId}/storage/cfgfiles
 ln -s $DATACLAYSESSIONCONFIG ~/.COMPSs/${jobId}/storage/cfgfiles/storage.properties
+
+echo "[@storage_init.sh] Ready!"
+
