@@ -84,12 +84,12 @@ echo "[@storage_init.sh] INFO: Found Python version $PYTHONVERSION "
 DATACLAYSRV_START_CMD="--container-python-version $SIMPLIFIED_PYTHONVERSION $DATACLAYSRV_START_CMD" # server will use this python version singularity image
 DATACLAYSRV_START_CMD="--pyclay-path $PYCLAY_PATH $DATACLAYSRV_START_CMD"
 DATACLAYSRV_START_CMD="--javaclay-path $DATACLAY_JAR $DATACLAYSRV_START_CMD"
-DATACLAY_COMPSS_EXTRAE_VERSION=3.5.3
+DATACLAY_DEFAULT_EXTRAE_VERSION=3.5.4
 
 # Specify extrae wrapper 
 if [[ $DATACLAYSRV_START_CMD == *"--tracing"* ]]; then
 	if [ -z $EXTRAE_HOME ]; then 
-		EXTRAE_VERSION=$DATACLAY_COMPSS_EXTRAE_VERSION
+		EXTRAE_VERSION=$DATACLAY_DEFAULT_EXTRAE_VERSION
 	else 
 		EXTRAE_VERSION=$(echo "${EXTRAE_HOME//\/apps\/BSCTOOLS\/extrae\//}" | awk -F "/" '{print $1}')
 		echo " [@storage_init.sh] **** Warning **** Found Extrae version $EXTRAE_VERSION "
