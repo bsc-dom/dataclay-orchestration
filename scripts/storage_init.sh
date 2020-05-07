@@ -60,7 +60,9 @@ if [ "${network}" == "infiniband" ]; then
 fi
 
 #----------------------------------------- SLURM -------------------------------------------------
-COMPSS_HOSTS="$storage_master_node $worker_nodes"
+# Note that $storage_master_node is used both as a client and for the LogicModule service.
+# Check dataclaysrv command for further information on the hosts semantics.
+COMPSS_HOSTS="$storage_master_node $storage_master_node $worker_nodes"
 JOB_HOSTS=($(echo $COMPSS_HOSTS | tr " " "\n"))
 HOSTS=""
 # Get hosts and add infiniband suffix if needed
