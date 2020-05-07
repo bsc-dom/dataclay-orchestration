@@ -482,14 +482,15 @@ function dataclaystart {
 	for DSNODE in $DSNODES; do
 	   DSCOUNTER=0
 	   dataclayecho "Waiting for $DSNODE Java execution environments to be ready... "
-	   while [ $DSCOUNTER -ne $JAVA_EE_PER_NODE ]; do
+	   
+	   while [ $DSCOUNTER -lt $JAVA_EE_PER_NODE ]; do
 	       DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin java | grep "${DSNAME_PREFIX}" | wc -l`
 	   done
 	   dataclayecho "$DSNODE Java execution environments are ready"
 	
 	   DSCOUNTER=0
 	   dataclayecho "Waiting for $DSNODE Python execution environments to be ready... "
-	   while [ $DSCOUNTER -ne $PYTHON_EE_PER_NODE ]; do
+	   while [ $DSCOUNTER -lt $PYTHON_EE_PER_NODE ]; do
 	       DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin python | grep "${DSNAME_PREFIX}" | wc -l`
 	   done
 	   dataclayecho "$DSNODE Python execution environments are ready"

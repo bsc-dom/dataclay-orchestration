@@ -103,6 +103,7 @@ if [[ $DATACLAYSRV_START_CMD == *"--tracing"* ]]; then
 	DATACLAYSRV_START_CMD="--javaclay-extrae-wrapper /apps/DATACLAY/dependencies/extrae_wrapper/lib/javaextrae/javaclay_extrae_wrapper${EXTRAE_VERSION}.so $DATACLAYSRV_START_CMD"
 	IFS=' ' read -r -a HOSTS_ARRAY <<< "$HOSTS"
 	COUNT=${#HOSTS_ARRAY[@]}
+	COUNT=$(expr $COUNT - 1)
 	DATACLAYSRV_START_CMD="--extrae-starting-task-id $COUNT $DATACLAYSRV_START_CMD"
     DATACLAYSRV_START_CMD="--extrae-config-file /apps/DATACLAY/$DATACLAY_VERSION/extrae/extrae_basic.xml $DATACLAYSRV_START_CMD"
 fi
