@@ -24,15 +24,15 @@ LOCAL_REPOSITORY=$ORCHESTRATION_DIR/singularity/images
 
 for JAVA_VERSION in ${SUPPORTED_JAVA_VERSIONS[@]}; do
 	EXECUTION_ENVIRONMENT_TAG="$(get_container_version jdk$JAVA_VERSION)"
-	singularity pull $LOCAL_REPOSITORY/logicmodule:${EXECUTION_ENVIRONMENT_TAG}.sif library://support-dataclay/default/logicmodule:$EXECUTION_ENVIRONMENT_TAG
-	singularity pull $LOCAL_REPOSITORY/dsjava:${EXECUTION_ENVIRONMENT_TAG}.sif library://support-dataclay/default/dsjava:$EXECUTION_ENVIRONMENT_TAG
+	singularity pull $LOCAL_REPOSITORY/logicmodule:${EXECUTION_ENVIRONMENT_TAG}.sif docker://bscdataclay/logicmodule:$EXECUTION_ENVIRONMENT_TAG
+	singularity pull $LOCAL_REPOSITORY/dsjava:${EXECUTION_ENVIRONMENT_TAG}.sif docker://bscdataclay/dsjava:$EXECUTION_ENVIRONMENT_TAG
 
 done
 for PYTHON_VERSION in ${SUPPORTED_PYTHON_VERSIONS[@]}; do
 	EXECUTION_ENVIRONMENT_TAG="$(get_container_version py$PYTHON_VERSION)"
-	singularity pull $LOCAL_REPOSITORY/dspython:${EXECUTION_ENVIRONMENT_TAG}.sif library://support-dataclay/default/dspython:$EXECUTION_ENVIRONMENT_TAG
+	singularity pull $LOCAL_REPOSITORY/dspython:${EXECUTION_ENVIRONMENT_TAG}.sif docker://bscdataclay/dspython:$EXECUTION_ENVIRONMENT_TAG
 done
 
-singularity pull $LOCAL_REPOSITORY/client:${DATACLAY_VERSION}.sif library://support-dataclay/default/client:${DATACLAY_VERSION}
+singularity pull $LOCAL_REPOSITORY/client:${DATACLAY_VERSION}.sif docker://bscdataclay/client:${DATACLAY_VERSION}
 
 exit 0
