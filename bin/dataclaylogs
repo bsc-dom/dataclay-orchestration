@@ -1,31 +1,8 @@
 #!/bin/bash
 function get_logs { 
 	HOSTNAME=$1
-	LOG_DIR=${HOME}/.dataClay/${DATACLAY_JOBID}/logs
-	mkdir -p $LOG_DIR
-	
-	### get local logs (shared fs)
-	LOCAL_FILES=$(find $HOME/.singularity/instances/logs/ -type f) 
-		for LOCAL_FILE in $LOCAL_FILES; do
-		FILENAME=$(basename $LOCAL_FILE) 
-		if [ ! -f $LOG_DIR/$FILENAME ]; then 
-			echo "Getting $LOCAL_FILE..."
-			cp $LOCAL_FILE $LOG_DIR
-			NEW_LOGS=$(($NEW_LOGS + 1))
-		fi
-	done
-
-	### get remote logs 
-	FILES=$(ssh -o ConnectTimeout=10 $HOSTNAME "find .singularity/instances/logs/ -type f")
-	for FILE in $FILES; do
-		FILENAME=$(basename $FILE) 
-		if [ ! -f $LOG_DIR/$FILENAME ]; then 
-			# Get it from remote host
-			echo "Getting remote $FILE..."
-			scp -r $HOSTNAME:$FILE $LOG_DIR
-			NEW_LOGS=$(($NEW_LOGS + 1))
-		fi
-	done
+	LOG_DIR=${HOME}/.dataClay/${DATACLAY_JOBID}
+	scp -r $HOSTNAME:$LOG_DIR/logs $LOG_DIR
 } 
 if [ "$#" -ne 1 ] && [ "$#" -ne 2 ] ; then
 	echo "ERROR: usage: $0 <jobid> <optional:pattern> "
@@ -47,7 +24,6 @@ source $JOB_CONFIG
 #------------------------------------------------------------------------------------------------------
 
 # for each host in the job, get it and store in folder 
-NEW_LOGS=0
 echo "Getting new logs into $HOME/.dataClay/$DATACLAY_JOBID/logs ..."
 pushd $HOME/.dataClay/$DATACLAY_JOBID/ >/dev/null
 get_logs $LMNODE
@@ -55,10 +31,10 @@ for NODE in $DSNODES; do
 	get_logs $NODE 
 done
 get_logs $CLIENTNODE
-echo "Found $NEW_LOGS new logs."
 popd >/dev/null
 
-pushd $LOG_DIR >/dev/null
+LOGS_DIR=${HOME}/.dataClay/${DATACLAY_JOBID}/logs
+pushd $LOGS_DIR >/dev/null
 echo "================ LOGS ================"
 grep --color=always "" ${PATTERN}* 2>/dev/null
 popd >/dev/null

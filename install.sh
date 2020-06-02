@@ -12,7 +12,7 @@ function download_singularity_image {
 		echo "WARNING: Found ${IMAGE_NAME} singularity image $IMAGE_PATH. Skipping."
 	else
 		echo "Downloading $IMAGE_NAME singularity image into $IMAGE_PATH"
-		singularity pull $IMAGE_PATH library://support-dataclay/default/${IMAGE_NAME}:${DATACLAY_VERSION}
+		singularity pull $IMAGE_PATH docker://bscdataclay/${IMAGE_NAME}:${DATACLAY_VERSION}
 	fi 
 }
 
