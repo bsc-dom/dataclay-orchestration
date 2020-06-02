@@ -13,6 +13,7 @@ function dataclayinfo(){ echo "$PREFIX ${1}"; }
 #=============================================================================
 function create_globaljob_config {
 	mkdir -p $DATACLAY_JOB_FOLDER
+	mkdir -p $LOG_DIR
 	# Global job config
 	echo "######## Global environment variables ########" > $GLOBAL_JOB_CONFIG
 	echo "export DATACLAY_VERSION=$DATACLAY_VERSION" >> $GLOBAL_JOB_CONFIG
@@ -102,7 +103,9 @@ function create_service_config {
 	echo "export LOGICMODULE_HOST=$LOGICMODULE_IP" >> $SERVICE_CONFIG
 	echo "export DATASERVICE_NAME=$DATACLAY_HOST" >> $SERVICE_CONFIG
 	echo "export DATASERVICE_JAVA_PORT_TCP=$DS_PORT" >> $SERVICE_CONFIG
+	DS_PORT=`expr $DS_PORT + 1`
 	echo "export DATASERVICE_PYTHON_PORT_TCP=$DS_PORT" >> $SERVICE_CONFIG
+	DS_PORT=`expr $DS_PORT + 1`
 	
 	## Extrae
 	echo "export EXTRAE_CONFIG_FILE=$EXTRAE_CONFIG_FILE" >> $SERVICE_CONFIG
@@ -110,7 +113,6 @@ function create_service_config {
 	echo "export PYCLAY_EXTRAE_WRAPPER_LIB=$PYCLAY_EXTRAE_WRAPPER_LIB" >> $SERVICE_CONFIG
 	echo "export JAVACLAY_EXTRAE_WRAPPER_LIB=$JAVACLAY_EXTRAE_WRAPPER_LIB" >> $SERVICE_CONFIG
 
-	DS_PORT=`expr $DS_PORT + 1`
 	
 }
 
@@ -238,7 +240,7 @@ function deploy {
 	echo "rm -rf \$HOME/.singularity/instances/logs" >> $DEPLOY_SCRIPT
 	echo "if [ ! -f $SERVICE_FOLDER/images/Singularity ]; then touch $SERVICE_FOLDER/images/Singularity; fi" >> $DEPLOY_SCRIPT
 	echo "if [ ! -f $SERVICE_FOLDER/images/${IMAGE}.sif ]; then
-		singularity pull $SERVICE_FOLDER/images/${IMAGE}.sif library://support-dataclay/default/${IMAGE};
+		singularity pull $SERVICE_FOLDER/images/${IMAGE}.sif docker://bscdataclay/${IMAGE};
 	fi" >> $DEPLOY_SCRIPT
 	echo "singularity exec $DATACLAY_BIND -B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh $SERVICE_FOLDER/images/${IMAGE}.sif env > $SERVICE_FOLDER/container.environment"	>> $DEPLOY_SCRIPT
 	
@@ -330,12 +332,15 @@ function start {
 	
 	echo "cd $SERVICE_FOLDER" >> $RUN_SCRIPT
 	echo "echo \"Starting ${SERVICENAME}\"" >> $RUN_SCRIPT
+	echo "mkdir -p $SERVICE_FOLDER/logs/" >> $RUN_SCRIPT
 
 	echo "singularity instance start -B $SERVICE_FOLDER/cfgfiles/log4j2.xml:/home/dataclayusr/dataclay/logging/log4j2.xml \
 		-B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh \
 		$DATACLAY_BIND \
-		$SERVICE_FOLDER/images/${IMAGE}.sif ${SERVICENAME} $FLAGS" >> $RUN_SCRIPT
-
+		$SERVICE_FOLDER/images/${IMAGE}.sif ${SERVICENAME}" >> $RUN_SCRIPT
+	echo "nohup singularity run instance://${SERVICENAME} $FLAGS &>${LOG_DIR}/${SERVICENAME}.out &2>${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT	
+		
+		
 	chmod +x $RUN_SCRIPT
 	if [ $SHARED_FS == true ]; then
 		mkdir -p $SERVICE_FOLDER
@@ -652,6 +657,7 @@ shift
 
 # global vars
 DATACLAY_JOB_FOLDER="$HOME/.dataClay/$DATACLAY_JOBID"
+LOG_DIR=${DATACLAY_JOB_FOLDER}/logs
 GLOBAL_JOB_CONFIG=$DATACLAY_JOB_FOLDER/job.config
 CLIENT_HOSTID="client"
 LM_HOSTID="logicmodule"
