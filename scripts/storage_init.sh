@@ -88,6 +88,12 @@ echo "[@storage_init.sh] INFO: Found Python version $PYTHONVERSION "
 DATACLAYSRV_START_CMD="--container-python-version $SIMPLIFIED_PYTHONVERSION $DATACLAYSRV_START_CMD" # server will use this python version singularity image
 DATACLAYSRV_START_CMD="--pyclay-path $PYCLAY_PATH $DATACLAYSRV_START_CMD"
 DATACLAYSRV_START_CMD="--javaclay-path $DATACLAY_JAR $DATACLAYSRV_START_CMD"
+# Support for legacy BACKENDS_PER_NODE env var (typically the user puts that var in $storageProps)
+if [ ! -z $BACKENDS_PER_NODE ]; then
+	DATACLAYSRV_START_CMD="--python-ee-per-sl $BACKENDS_PER_NODE $DATACLAYSRV_START_CMD"
+fi
+
+
 DATACLAY_DEFAULT_EXTRAE_VERSION=3.5.4
 
 # Specify extrae wrapper 
