@@ -21,8 +21,8 @@ function create_globaljob_config {
 	echo "export LMNODE=$LMNODE" >> $GLOBAL_JOB_CONFIG
 	echo "export CLIENTNODE=$CLIENTNODE" >> $GLOBAL_JOB_CONFIG
 	echo "export DSNODES=\"$DSNODES\"" >> $GLOBAL_JOB_CONFIG
-	echo "export PYTHON_EE_PER_NODE=$PYTHON_EE_PER_NODE" >> $GLOBAL_JOB_CONFIG
-	echo "export JAVA_EE_PER_NODE=$JAVA_EE_PER_NODE" >> $GLOBAL_JOB_CONFIG	
+	echo "export PYTHON_EE_PER_SL=$PYTHON_EE_PER_SL" >> $GLOBAL_JOB_CONFIG
+	echo "export JAVA_SL_PER_NODE=$JAVA_SL_PER_NODE" >> $GLOBAL_JOB_CONFIG	
 	echo "export PROLOG_SCRIPT=$PROLOG_SCRIPT" >> $GLOBAL_JOB_CONFIG
 	echo "export PROLOG_CMD=\"$PROLOG_CMD\"" >> $GLOBAL_JOB_CONFIG
 	echo "export DEBUG=$DEBUG" >> $GLOBAL_JOB_CONFIG
@@ -37,6 +37,14 @@ function create_globaljob_config {
 }
 
 function create_service_config {
+	# FIXME: SERVICENAME is a pseudo-global unsafe variable
+	# The caller should provide both the JAVA_PORT and PYTHON_PORT
+	JAVA_PORT=$1
+	PYTHON_PORT=$2
+	# Both are required for Python dataservices (as the JAVA_PORT is the StorageLocation,
+	# i.e. the Java backend to which Python will connect).
+	# Java dataservices only require the JAVA_PORT
+
 	SERVICE_CONFIG=$DATACLAY_JOB_FOLDER/${SERVICENAME}.config
 	# Do not use DATACLAY_JOB_FOLDER since it is expanding current $HOME and not remote one
 	if [ $SHARED_FS == true ]; then
@@ -102,10 +110,8 @@ function create_service_config {
 	echo "export DEPLOY_PATH_SRC=$DEPLOY_PATH_SRC" >> $SERVICE_CONFIG
 	echo "export LOGICMODULE_HOST=$LOGICMODULE_IP" >> $SERVICE_CONFIG
 	echo "export DATASERVICE_NAME=$DATACLAY_HOST" >> $SERVICE_CONFIG
-	echo "export DATASERVICE_JAVA_PORT_TCP=$DS_PORT" >> $SERVICE_CONFIG
-	DS_PORT=`expr $DS_PORT + 1`
-	echo "export DATASERVICE_PYTHON_PORT_TCP=$DS_PORT" >> $SERVICE_CONFIG
-	DS_PORT=`expr $DS_PORT + 1`
+	echo "export DATASERVICE_JAVA_PORT_TCP=$JAVA_PORT" >> $SERVICE_CONFIG
+	echo "export DATASERVICE_PYTHON_PORT_TCP=$PYTHON_PORT" >> $SERVICE_CONFIG
 	
 	## Extrae
 	echo "export EXTRAE_CONFIG_FILE=$EXTRAE_CONFIG_FILE" >> $SERVICE_CONFIG
@@ -132,6 +138,7 @@ function generate_env_file {
 
 
 function create_script { 
+	# FIXME: SERVICE_CONFIG is a pseudo-global unsafe variable
 	SCRIPT_PATH=$1
 	echo "#!/bin/bash" > $SCRIPT_PATH	
 	echo "set -e" >> $SCRIPT_PATH
@@ -217,9 +224,15 @@ function deploy {
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
 	IMAGE=$4 #service image name (logicmodule, dsjava.2.X.jdk11.dev, dspython.2.X.py37, client) 
 	
-	dataclayecho "Deploying $SERVICENAME to $HOSTNAME..."
-	create_service_config
-		
+	# The caller should provide both the JAVA_PORT and PYTHON_PORT
+	JAVA_PORT=$5
+	PYTHON_PORT=$6
+	# Both are required for Python dataservices (as the JAVA_PORT is the StorageLocation,
+	# i.e. the Java backend to which Python will connect).
+	# Java dataservices only require the JAVA_PORT
+	
+	dataclayecho "Deploying $SERVICENAME to $HOSTNAME... (parameters: JAVA_PORT=$JAVA_PORT, PYTHON_PORT=$PYTHON_PORT)"
+	create_service_config $JAVA_PORT $PYTHON_PORT
 	DEPLOY_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${SERVICENAME}_deploy.XXXX)
 	create_script $DEPLOY_SCRIPT 	
 	
@@ -271,6 +284,8 @@ function deploy_client {
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
 	IMAGE=$4 #service image name (logicmodule, dsjava.2.X.jdk11.dev, dspython.2.X.py37, client) 
 	
+	# Note that client deployment does not use/need neither JAVA_PORT nor PYTHON_PORT
+
 	deploy $@ #common deploy
 	
 	create_service_config
@@ -322,7 +337,15 @@ function start {
 	SERVICENAME=$3 #service name
 	IMAGE=$4 #service (logicmodule, dsjava, dspython, client) 
 	
-	create_service_config
+	# The caller should provide both the JAVA_PORT and PYTHON_PORT
+	JAVA_PORT=$5
+	PYTHON_PORT=$6
+	# Both are required for Python dataservices (as the JAVA_PORT is the StorageLocation,
+	# i.e. the Java backend to which Python will connect).
+	# Java dataservices only require the JAVA_PORT
+
+	dataclayecho "Starting $SERVICENAME to $HOSTNAME... (parameters: JAVA_PORT=$JAVA_PORT, PYTHON_PORT=$PYTHON_PORT)"
+	create_service_config $JAVA_PORT $PYTHON_PORT
 
 	RUN_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${SERVICENAME}_run.XXXX) # i.e. 24000_LM
 	create_script $RUN_SCRIPT 
@@ -436,17 +459,29 @@ function dataclaydeploy {
 
 	deploy $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
 	i=1
+	wait_pids=()
 	for NODE in $DSNODES; do
-		for j in $(seq 1 $JAVA_EE_PER_NODE); do
+		for j in $(seq 1 $JAVA_SL_PER_NODE); do
 			SERVICENAME=dsjava${i}_${j}
-			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX
+			JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
+			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX $JAVA_PORT &
+			wait_pids+=($!)
+			for k in $(seq 1 $PYTHON_EE_PER_SL); do
+			    node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
+				PYTHON_PORT=$(( $PYTHON_DS_BASE_PORT + $node_index ))
+				SERVICENAME=dspython${i}_${node_index}
+				deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX $JAVA_PORT $PYTHON_PORT &
+				wait_pids+=($!)
+			done
 		done 
-		for j in $(seq 1 $PYTHON_EE_PER_NODE); do
-			SERVICENAME=dspython${i}_${j}
-			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX
-		done
+
 		i=$(($i + 1))
 	done
+
+	for pid in ${wait_pids[*]}; do
+		wait $pid
+	done
+
 	deploy_client $CLIENTNODE ${CLIENT_HOSTID} client client:$DATACLAY_VERSION
 
 	echo "$DATACLAY_JOBID" >> $DEPLOYED_DATACLAY_JOBS
@@ -467,18 +502,29 @@ function dataclaystart {
 	source $GLOBAL_JOB_CONFIG
 	start $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
 	i=1
+	wait_pids=()
 	for NODE in $DSNODES; do
-		for j in $(seq 1 $JAVA_EE_PER_NODE); do
+		for j in $(seq 1 $JAVA_SL_PER_NODE); do
 			SERVICENAME=dsjava${i}_${j}
-			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX
-		done 
-		for j in $(seq 1 $PYTHON_EE_PER_NODE); do
-			SERVICENAME=dspython${i}_${j}
-			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX 
+			JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
+			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX $JAVA_PORT &
+			wait_pids+=($!)
+			for k in $(seq 1 $PYTHON_EE_PER_SL); do
+			    node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
+				PYTHON_PORT=$(( $PYTHON_DS_BASE_PORT + $node_index ))
+				SERVICENAME=dspython${i}_${node_index}
+				start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX $JAVA_PORT $PYTHON_PORT &
+				wait_pids+=($!)
+			done
 		done
+
 		i=$(($i + 1))
 	done
-		
+
+	for pid in ${wait_pids[*]}; do
+		wait $pid
+	done
+	
 	############ VERIFY ############ 
 	# Wait for dataClay to be read
 	$SCRIPTDIR/dataclay WaitForDataClayToBeAlive 20 3
@@ -488,14 +534,17 @@ function dataclaystart {
 	   DSCOUNTER=0
 	   dataclayecho "Waiting for $DSNODE Java execution environments to be ready... "
 	   
-	   while [ $DSCOUNTER -lt $JAVA_EE_PER_NODE ]; do
+	   while [ $DSCOUNTER -lt $JAVA_SL_PER_NODE ]; do
+	       $SCRIPTDIR/dataclay GetBackends admin admin java
 	       DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin java | grep "${DSNAME_PREFIX}" | wc -l`
+		   sleep 5
 	   done
 	   dataclayecho "$DSNODE Java execution environments are ready"
 	
 	   DSCOUNTER=0
 	   dataclayecho "Waiting for $DSNODE Python execution environments to be ready... "
-	   while [ $DSCOUNTER -lt $PYTHON_EE_PER_NODE ]; do
+	   TOTAL_PYTHON_PER_NODE=$(( $PYTHON_EE_PER_SL * $JAVA_SL_PER_NODE ))
+	   while [ $DSCOUNTER -lt $TOTAL_PYTHON_PER_NODE ]; do
 	       DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin python | grep "${DSNAME_PREFIX}" | wc -l`
 	   done
 	   dataclayecho "$DSNODE Python execution environments are ready"
@@ -514,18 +563,27 @@ function dataclaystop {
 	source $GLOBAL_JOB_CONFIG
 	#------------------------------------------------------------------------------------------------------
 	i=1
+	wait_pids=()
 	for NODE in $DSNODES; do
 		#### NOTE: stop first dspython
-		for j in $(seq 1 $PYTHON_EE_PER_NODE); do
-			SERVICENAME=dspython${i}_${j}
-			stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX
-		done
-		for j in $(seq 1 $JAVA_EE_PER_NODE); do
+		for j in $(seq 1 $JAVA_SL_PER_NODE); do
 			SERVICENAME=dsjava${i}_${j}
-			stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX
+			stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX &
+			wait_pids+=($!)
+			for k in $(seq 1 $PYTHON_EE_PER_SL); do
+				node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
+				SERVICENAME=dspython${i}_${node_index}
+				stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX &
+				wait_pids+=($!)
+			done
 		done 
 		i=$(($i + 1))
 	done
+
+	for pid in ${wait_pids[*]}; do
+		wait $pid
+	done
+
 	stop $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
 	
 	dataclayinfo "========== dataClay stopped! ========== "
@@ -545,17 +603,26 @@ function dataclayclean {
 		CLEAN=true
 		dataclaystop
 		i=1
+		wait_pids=()
 		for NODE in $DSNODES; do
-			for j in $(seq 1 $PYTHON_EE_PER_NODE); do
-				SERVICENAME=dspython${i}_${j}
-				clean $NODE ${DSNAME_PREFIX}${i} $SERVICENAME
-			done
-			for j in $(seq 1 $JAVA_EE_PER_NODE); do
+			for j in $(seq 1 $JAVA_SL_PER_NODE); do
 				SERVICENAME=dsjava${i}_${j}
-				clean $NODE ${DSNAME_PREFIX}${i} $SERVICENAME
+				clean $NODE ${DSNAME_PREFIX}${i} $SERVICENAME &
+				wait_pids+=($!)
+				for k in $(seq 1 $PYTHON_EE_PER_SL); do
+					node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
+					SERVICENAME=dspython${i}_${node_index}
+					clean $NODE ${DSNAME_PREFIX}${i} $SERVICENAME &
+					wait_pids+=($!)
+				done
 			done 
 			i=$(($i + 1))
 		done
+
+		for pid in ${wait_pids[*]}; do
+			wait $pid
+		done
+
 		clean $LMNODE ${LM_HOSTID} logicmodule
 		clean $CLIENTNODE ${CLIENT_HOSTID} client
 		rm -rf $DATACLAY_JOB_FOLDER
@@ -671,9 +738,10 @@ JAVA_CONTAINER_SUFFIX=$(get_container_version jdk$DATACLAY_JAVA_VERSION)
 PYTHON_CONTAINER_SUFFIX=$(get_container_version py$DATACLAY_PYTHON_VERSION)
 SHARED_FS=FALSE
 EXTRAE_STARTING_TASK_ID=0
-JAVA_EE_PER_NODE=1
-PYTHON_EE_PER_NODE=1
-DS_PORT=2222
+JAVA_SL_PER_NODE=1
+PYTHON_EE_PER_SL=1
+JAVA_DS_BASE_PORT=2222
+PYTHON_DS_BASE_PORT=2666
 SINGULARITY_IMAGES_HOME=$DATACLAY_BASE/singularity/images/
 LOG4J_CONFIG=$DATACLAY_BASE/logging/info.xml
 DEBUG=False
@@ -745,10 +813,10 @@ do
 				PYCLAY_PATH=$1
 				dataclayecho "- using pyclay path $PYCLAY_PATH"
 		    	;;	
-			--python-ee-per-node) 
+			--python-ee-per-sl) 
 		    	shift 
-		    	PYTHON_EE_PER_NODE=$1
-	            dataclayecho "- setting python execution environment per node = $PYTHON_EE_PER_NODE"
+		    	PYTHON_EE_PER_SL=$1
+	            dataclayecho "- setting python execution environment per storage location = $PYTHON_EE_PER_SL"
 		    	;;
 		    --container-python-version) 
 		    	shift
