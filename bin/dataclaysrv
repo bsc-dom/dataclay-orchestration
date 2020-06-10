@@ -338,7 +338,7 @@ function start {
 		-B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh \
 		$DATACLAY_BIND \
 		$SERVICE_FOLDER/images/${IMAGE}.sif ${SERVICENAME}" >> $RUN_SCRIPT
-	echo "nohup singularity run instance://${SERVICENAME} $FLAGS &>${LOG_DIR}/${SERVICENAME}.out &2>${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT	
+	echo "nohup singularity run instance://${SERVICENAME} $FLAGS >${LOG_DIR}/${SERVICENAME}.out 2>${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 		
 		
 	chmod +x $RUN_SCRIPT
