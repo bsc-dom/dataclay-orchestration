@@ -1,15 +1,8 @@
 #!/bin/bash
 function get_logs { 
 	HOSTNAME=$1
-	LOG_DIR=${HOME}/.dataClay/${DATACLAY_JOBID}/logs
-	FILES=$(ssh $HOSTNAME "find .singularity/instances/logs/ -type f")
-	mkdir -p $LOG_DIR
-	for FILE in $FILES; do
-		FILENAME=$(basename $FILE) 
-		if [ ! -f $LOG_DIR/$FILENAME ]; then 
-			scp -r $HOSTNAME:$FILE $LOG_DIR
-		fi
-	done
+	LOG_DIR=${HOME}/.dataClay/${DATACLAY_JOBID}
+	scp -r $HOSTNAME:$LOG_DIR/logs $LOG_DIR
 } 
 if [ "$#" -ne 1 ] && [ "$#" -ne 2 ] ; then
 	echo "ERROR: usage: $0 <jobid> <optional:pattern> "
@@ -31,7 +24,7 @@ source $JOB_CONFIG
 #------------------------------------------------------------------------------------------------------
 
 # for each host in the job, get it and store in folder 
-echo "Getting logs into $HOME/.dataClay/$DATACLAY_JOBID/logs ..."
+echo "Getting new logs into $HOME/.dataClay/$DATACLAY_JOBID/logs ..."
 pushd $HOME/.dataClay/$DATACLAY_JOBID/ >/dev/null
 get_logs $LMNODE
 for NODE in $DSNODES; do
@@ -40,7 +33,8 @@ done
 get_logs $CLIENTNODE
 popd >/dev/null
 
-pushd $LOG_DIR >/dev/null
+LOGS_DIR=${HOME}/.dataClay/${DATACLAY_JOBID}/logs
+pushd $LOGS_DIR >/dev/null
 echo "================ LOGS ================"
 grep --color=always "" ${PATTERN}* 2>/dev/null
 popd >/dev/null

@@ -10,8 +10,9 @@ declare -a ARGS
 while test $# -gt 0
 do
 	case "$1" in
-			--marenostrum) 
-		    	export DATACLAY_JOBID=$SLURM_JOBID
+			--jobid)
+				shift 
+		    	export DATACLAY_JOBID=$1
 	            dataclayecho "- provided job id = $DATACLAY_JOBID"
 		    	;;
 			--*) 
@@ -24,17 +25,18 @@ do
     shift
 done
 
-if [ ${#ARGS[@]} -ne 3 ]; then
+if [ ${#ARGS[@]} -ne 4 ]; then
     dataclayerr "Wrong number of arguments. Found ${ARGS[@]}
-             Usage: $0 <modelpath> <namespace> <language> <--option1> <--option2...> where: 
+             Usage: $0 <modelpath> <appsrcpath> <namespace> <language> <--option1> <--option2...> where: 
                   - modelpath: path where .py files or .class files are located depending on the language 
                   - language: either java or python
 	"
 fi 
 
 MODELSRCPATH="${ARGS[0]}"
-DATACLAY_NAMESPACE="${ARGS[1]}"
-LANGUAGE="${ARGS[2]}"
+APP_SOURCE="${ARGS[1]}"
+DATACLAY_NAMESPACE="${ARGS[2]}"
+LANGUAGE="${ARGS[3]}"
 # Check paths
 if [[ $MODELSRCPATH != /* ]]; then
     dataclayerr "Model path must be absolute. Found $MODELSRCPATH" 
@@ -42,8 +44,15 @@ fi
 if [ ! -d $MODELSRCPATH ]; then
     dataclayerr "Model path does not exist. Found $MODELSRCPATH"
 fi
+if [[ $APP_SOURCE != /* ]]; then
+    dataclayerr "App source path must be absolute. Found ${APP_SOURCE}" 
+fi
 
 # ------------------------------ dataClay Job configuration -------------------------------------------
+if [ ! -z $SLURM_JOBID ]; then 
+	export DATACLAY_JOBID=$SLURM_JOBID
+    dataclaywarn "SLURM JOB ID detected. Using it. DATACLAY_JOBID = $DATACLAY_JOBID"
+fi
 if [ -z $DATACLAY_JOBID ]; then 
 	ID=$(dataclayid $PPID)
 	if [ ! -z $ID ]; then export DATACLAY_JOBID=$ID; fi
@@ -71,7 +80,7 @@ dataclay NewDataContract ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_DATASET} ${D
 if [ $LANGUAGE == "java" ]; then 
 	# Compile classes 
 	scp -q -r ${MODELSRCPATH} ${CLIENTNODE}:${MODEL_PATH}
-	echo "$JOB_FOLDER/client exec javac -cp ${DATACLAY_JAR} \$(find ${MODEL_PATH} -name *.java) -d ${MODEL_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
+	echo "$SERVICE_FOLDER/client exec javac -source $DATACLAY_JAVA_VERSION -target $DATACLAY_JAVA_VERSION \$(find ${MODEL_PATH} -name *.java) -d ${MODEL_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
 else 
 	scp -q -r ${MODELSRCPATH}/* ${CLIENTNODE}:${MODEL_BIN_PATH}
 fi 
@@ -79,10 +88,19 @@ dataclay NewModel ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_NAMESPACE} ${MODEL_
 # Get stubs 
 dataclay GetStubs ${DATACLAY_USR} ${DATACLAY_PWD} ${DATACLAY_NAMESPACE} ${STUBS_PATH}
 
-
-
-
-
+# Compile java app
+if [ $LANGUAGE == "java" ]; then 
+	if [[ $APP_SOURCE != /* ]]; then
+	    dataclayerr "App source path must be absolute. Found ${APP_SOURCE}" 
+	fi
+	dataclayinfo "Compiling application from ${APP_SOURCE} to ${APP_BIN_PATH}"
+	
+	scp -r -q ${APP_SOURCE} ${CLIENTNODE}:${APP_PATH}
+	echo "$SERVICE_FOLDER/client exec javac -cp ${STUBS_PATH}:${DATACLAY_JAR}:${COMPSS_HOME}/Runtime/compss-engine.jar \$(find $APP_PATH -name *.java) -d ${APP_BIN_PATH}" | ssh "${CLIENTNODE}" bash -s
+fi
+if [ $LANGUAGE == "python" ]; then 
+	scp -r -q ${APP_SOURCE} ${CLIENTNODE}:${APP_PATH}
+fi
 
 
 
