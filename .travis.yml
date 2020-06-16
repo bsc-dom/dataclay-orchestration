@@ -13,7 +13,7 @@ jobs:
       before_install:
         - .travis/set_ssh.sh
         - git remote set-url origin git@github.com:bsc-dom/dataclay-orchestration.git
-      deploy:
+      script:
         - .travis/prepare_version.sh
         - .travis/git_tag.sh
         - .travis/new_version.sh
