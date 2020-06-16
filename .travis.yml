@@ -9,7 +9,7 @@ jobs:
     - stage: test 
       script: echo "No test defined"
     - stage: deploy_release
-      if: branch = master
+      if: branch = master AND type != pull_request
       before_install:
         - .travis/set_ssh.sh
         - git remote set-url origin git@github.com:bsc-dom/dataclay-orchestration.git
