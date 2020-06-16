@@ -6,6 +6,8 @@ env:
     - secure: "PTUwQN1BksMkqJK1EStLW0dV4bnFSpeKXiw8ZudteP/OXNmTflxrfCZZyfK3CaRPW/NH+KZzeFgGg/ghRyJeiZ9yPaBB7MvOO0zoTlUABEWivffoqeFIge9/enHU9xoPt0ZU7L8MovFUdC8OGW1B5xRyED2EM+mqMCKsPYWmtFTLp5SwRkSQPI1/fGu1yea9iKIIXsK8QsvXgXGoaksdrkZotq2u9YvwzZpeAYQg6A7mqtVbkUSHqJgBnp0Nfrkbx4lmdTqnPcNH38rwFtp9hbA8pPN90OVvnaP6y8YDyxxzizMMNIJsD7FP9W9J5ax+lCvqc03teI3N7novajPAOC+oRSJGO6Wvu/3EVkdTEYRnTGi86wot7dfMrumwBZFei9r672LNvOHmExx9l4YbLCYBHn2miIdOlAAbYvP/wUiLXwvMFrD5sAfvIpSro7WysjYnAx4rToJzPPWDeglIDBDvzLX1Or9z+vh64KkYZdwwlivoo7qU4/xM6JXJdxu/1zkYMUAScuivOiQ42Y8UlUnDgt3MjfHwCdtMb3qtmsIj4I8yArZ7xVN/hDf5JU5OrUb66+2EY4iy55NtHyASVm7v8YOStAR///kGDi+e91xORJWV98Ckp8Y/ZdWwcXDG3y36UhvYUwY0s0Ybx9y3b8UWCCdtGxAsHJiaxqHhy1E="
 jobs:
   include:
+    - stage: test 
+      script: echo "No test defined"
     - stage: deploy_release
       if: branch = master
       before_install:
