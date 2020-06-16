@@ -9,6 +9,7 @@ if [ "$TRAVIS_BRANCH" == "master" ]; then
 	 git push origin HEAD:$TRAVIS_BRANCH
 	 
 	 ## update develop branch also ##
+	 git fetch
 	 git checkout develop
      git add VERSION.txt
 	 git commit -m "New release"
