@@ -7,7 +7,7 @@ env:
 jobs:
   include:
     - stage: deploy_release
-      if: branch = master AND type != pull_request AND commit_message != "New release"
+      if: branch = master AND type = api
       before_install:
         - .travis/set_ssh.sh
         - git remote set-url origin git@github.com:bsc-dom/dataclay-orchestration.git
