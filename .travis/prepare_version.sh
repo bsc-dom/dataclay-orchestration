@@ -5,7 +5,7 @@ if [ "$TRAVIS_BRANCH" == "master" ]; then
      NEW_VERSION=${VERSION%".dev"}
      echo $NEW_VERSION > VERSION.txt
      git add VERSION.txt
-	 git commit -m "New release"
+	 git commit -m "Modified VERSION.txt"
 	 git push origin HEAD:$TRAVIS_BRANCH
 else
      echo "Skipping prepare version tag because current branch is not master";
