@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 #-----------------------------------------------------------------------
 # Helper functions (miscellaneous)
@@ -63,7 +63,7 @@ if [ "$DEV" = false ] ; then
   printMsg "  ==  Preparing master branch"
   echo "${VERSION}" > VERSION.txt
   git commit -m "Released ${VERSION}"
-  git push origin HEAD:master
+  git push
 
   printMsg "  ==  Tagging new release in Git"
   git tag -a ${GIT_TAG} -m "Release ${GIT_TAG}"
@@ -74,11 +74,10 @@ if [ "$DEV" = false ] ; then
   echo "${NEW_VERSION}.dev" > VERSION.txt
 
   ## update develop branch also ##
-  git fetch --all
   git checkout develop
   git add VERSION.txt
-  git commit -m "Updating version.txt"
-  git push origin HEAD:develop
+  git commit -m "Preparing new development version"
+  git push
 
   # back to master
   git checkout master
