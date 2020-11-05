@@ -62,6 +62,7 @@ if [ "$DEV" = false ] ; then
 
   printMsg "  ==  Preparing master branch"
   echo "${VERSION}" > VERSION.txt
+  git add VERSION.txt
   git commit -m "Released ${VERSION}"
   git push
 
