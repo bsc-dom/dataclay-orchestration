@@ -75,6 +75,7 @@ if [ "$DEV" = false ] ; then
 
   ## update develop branch also ##
   git checkout develop
+  git merge master
   git add VERSION.txt
   git commit -m "Preparing new development version"
   git push
