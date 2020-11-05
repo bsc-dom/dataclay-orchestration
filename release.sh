@@ -72,10 +72,10 @@ if [ "$DEV" = false ] ; then
 
   printMsg "  ==  Preparing develop branch"
   NEW_VERSION=$(echo "$VERSION + 0.1" | bc)
-  echo "${NEW_VERSION}.dev" > VERSION.txt
 
   ## update develop branch also ##
   git checkout develop
+  echo "${NEW_VERSION}.dev" > VERSION.txt
   git merge master
   git add VERSION.txt
   git commit -m "Preparing new development version"
