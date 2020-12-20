@@ -9,3 +9,4 @@
 - .dockerignore
 - *latest*
 - *_pb2*
+- *.sif
