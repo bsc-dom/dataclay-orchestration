@@ -102,7 +102,7 @@ function create_service_config {
 	echo "################" >> $SERVICE_CONFIG
 
 	#  LM
-    echo "export LOGICMODULE_PORT_TCP=1111" >> $SERVICE_CONFIG
+    echo "export LOGICMODULE_PORT_TCP=$LOGICMODULE_PORT" >> $SERVICE_CONFIG
 	echo "export DATACLAY_ADMIN_USER=admin" >> $SERVICE_CONFIG
 	echo "export DATACLAY_ADMIN_PASSWORD=admin" >> $SERVICE_CONFIG
 	# DSs	
@@ -171,7 +171,7 @@ function generate_global_properties {
 
 function generate_client_properties { 
     echo "echo \"HOST=$LOGICMODULE_IP\" > $DATACLAYCLIENTCONFIG" >> $RUN_SCRIPT
-    echo "echo \"TCPPORT=1111\" >> $DATACLAYCLIENTCONFIG" >> $RUN_SCRIPT
+    echo "echo \"TCPPORT=$LOGICMODULE_PORT\" >> $DATACLAYCLIENTCONFIG" >> $RUN_SCRIPT
 }
 
 function generate_session_properties { 
@@ -434,12 +434,45 @@ function clean {
 
 # ==================== SERVICES ============================ #
 
+function prepare_available_ports {
+  # Set available ports
+  if [ -z "$AVAILABLE_PORTS" ]; then
+    AVAILABLE_PORTS=(1111)
+    for j in $(seq 1 $JAVA_SL_PER_NODE); do
+        JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
+        AVAILABLE_PORTS=(${AVAILABLE_PORTS[@]} $JAVA_PORT)
+        for k in $(seq 1 $PYTHON_EE_PER_SL); do
+            node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
+            PYTHON_PORT=$(( $PYTHON_DS_BASE_PORT + $node_index ))
+            AVAILABLE_PORTS=(${AVAILABLE_PORTS[@]} $PYTHON_PORT)
+        done
+    done
+  fi
+  LOGICMODULE_PORT=${AVAILABLE_PORTS[0]}
+  # Iterate the loop to read and print each array element
+  printf "$PREFIX - using ports: "
+  for value in "${AVAILABLE_PORTS[@]}"
+  do
+       printf "$value "
+  done
+  echo ""
+  # check available ports size
+  DSNODES=${HOSTS[@]:2}  # DS nodes
+  NUM_DSNODES=${#DSNODES[@]}
+  JAVA_SL_NUM=$(($JAVA_SL_PER_NODE * $NUM_DSNODES))
+  EXPECTED_PORTS=$((1 + $JAVA_SL_NUM + $PYTHON_EE_PER_SL * $JAVA_SL_NUM))
+  NUM_PORTS=${#AVAILABLE_PORTS[@]}
+  if [ "$NUM_PORTS" -ne "$EXPECTED_PORTS" ]; then
+      dataclayerr "Available ports not sufficient. Expected $EXPECTED_PORTS ports but $NUM_PORTS were given: ${AVAILABLE_PORTS[@]}"
+  fi
+}
+
 function dataclaydeploy { 
 	
 	dataclayclean
-
-  	dataclaywarn "Job was not deployed. Going to deploy."
+  dataclaywarn "Job was not deployed. Going to deploy."
 	dataclayinfo "========== Deploying dataClay =========="
+  prepare_available_ports
 
 	dataclayecho "- deploying to hosts = \"$HOSTS\""
 	HOSTS=($(echo $HOSTS | tr " " "\n"))
@@ -460,15 +493,18 @@ function dataclaydeploy {
 	deploy $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
 	i=1
 	wait_pids=()
+	current_available_port_idx=1
 	for NODE in $DSNODES; do
 		for j in $(seq 1 $JAVA_SL_PER_NODE); do
 			SERVICENAME=dsjava${i}_${j}
-			JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
+			JAVA_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
+			current_available_port_idx=$((current_available_port_idx + 1))
 			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX $JAVA_PORT &
 			wait_pids+=($!)
 			for k in $(seq 1 $PYTHON_EE_PER_SL); do
-			    node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
-				PYTHON_PORT=$(( $PYTHON_DS_BASE_PORT + $node_index ))
+				PYTHON_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
+				current_available_port_idx=$((current_available_port_idx + 1))
+				node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
 				SERVICENAME=dspython${i}_${node_index}
 				deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX $JAVA_PORT $PYTHON_PORT &
 				wait_pids+=($!)
@@ -497,21 +533,24 @@ function dataclaystart {
 	fi
 
 	dataclayinfo "========== Starting dataClay ========== "
-
+  prepare_available_ports
 	# Get client config to get DS nodes and LM node
 	source $GLOBAL_JOB_CONFIG
 	start $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
 	i=1
 	wait_pids=()
+	current_available_port_idx=1
 	for NODE in $DSNODES; do
 		for j in $(seq 1 $JAVA_SL_PER_NODE); do
 			SERVICENAME=dsjava${i}_${j}
-			JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
+			JAVA_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
+			current_available_port_idx=$((current_available_port_idx + 1))
 			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX $JAVA_PORT &
 			wait_pids+=($!)
 			for k in $(seq 1 $PYTHON_EE_PER_SL); do
-			    node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
-				PYTHON_PORT=$(( $PYTHON_DS_BASE_PORT + $node_index ))
+				PYTHON_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
+			  current_available_port_idx=$((current_available_port_idx + 1))
+			  node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
 				SERVICENAME=dspython${i}_${node_index}
 				start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX $JAVA_PORT $PYTHON_PORT &
 				wait_pids+=($!)
@@ -723,6 +762,7 @@ done < "$DEPLOYED_DATACLAY_JOBS"
 shift
 
 # global vars
+mkdir -p $HOME/.dataClay/
 DATACLAY_JOB_FOLDER="$HOME/.dataClay/$DATACLAY_JOBID"
 LOG_DIR=${DATACLAY_JOB_FOLDER}/logs
 GLOBAL_JOB_CONFIG=$DATACLAY_JOB_FOLDER/job.config
@@ -812,7 +852,13 @@ do
 				shift
 				PYCLAY_PATH=$1
 				dataclayecho "- using pyclay path $PYCLAY_PATH"
-		    	;;	
+		    	;;
+		    --available-ports)
+		      shift
+		      AVAILABLE_PORTS=$1
+		      AVAILABLE_PORTS=($(echo $AVAILABLE_PORTS | tr " " "\n"))
+				  dataclayecho "- provided available ports $1"
+				  ;;
 			--python-ee-per-sl) 
 		    	shift 
 		    	PYTHON_EE_PER_SL=$1
