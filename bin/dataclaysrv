@@ -59,6 +59,7 @@ function create_service_config {
 	fi
 	#CLIENT_IP=`host ${CLIENTNODE} | rev | cut -d ' ' -f1 | rev`
 	STORAGE_PATH="$SERVICE_FOLDER/storage"
+	STORAGE_METADATA_PATH="$STORAGE_PATH/metadata"
 	APP_PATH="$SERVICE_FOLDER/app"
 	APP_BIN_PATH="$APP_PATH/bin"
 	MODEL_PATH="$SERVICE_FOLDER/model"
@@ -154,6 +155,7 @@ function create_script {
 
 function generate_global_properties { 
     echo "echo \"STORAGE_PATH=$STORAGE_PATH\" > $DATACLAYGLOBALCONFIG" >> $RUN_SCRIPT
+    echo "echo \"STORAGE_METADATA_PATH=$STORAGE_METADATA_PATH\" >> $DATACLAYGLOBALCONFIG" >> $RUN_SCRIPT
     echo "echo \"STATE_FILE_PATH=$STORAGE_PATH/state.txt\" >> $DATACLAYGLOBALCONFIG" >> $RUN_SCRIPT
     echo "echo \"EE_PERSISTENT_INFO_PATH=$STORAGE_PATH/\" >> $DATACLAYGLOBALCONFIG" >> $RUN_SCRIPT
     echo "echo \"DEFAULT_GLOBALGC_CACHE_PATH=$STORAGE_PATH/\" >> $DATACLAYGLOBALCONFIG" >> $RUN_SCRIPT
@@ -249,6 +251,7 @@ function deploy {
 	echo "mkdir -p $DEPLOY_PATH" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $DEPLOY_PATH_SRC" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $STORAGE_PATH" >> $DEPLOY_SCRIPT
+	echo "mkdir -p $STORAGE_METADATA_PATH" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $SERVICE_FOLDER/images/" >> $DEPLOY_SCRIPT
 	echo "rm -rf \$HOME/.singularity/instances/logs" >> $DEPLOY_SCRIPT
 	echo "if [ ! -f $SERVICE_FOLDER/images/Singularity ]; then touch $SERVICE_FOLDER/images/Singularity; fi" >> $DEPLOY_SCRIPT
