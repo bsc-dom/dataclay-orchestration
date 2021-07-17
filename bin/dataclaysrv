@@ -59,7 +59,7 @@ function create_service_config {
 	fi
 	#CLIENT_IP=`host ${CLIENTNODE} | rev | cut -d ' ' -f1 | rev`
 	STORAGE_PATH="$SERVICE_FOLDER/storage"
-	STORAGE_METADATA_PATH="$STORAGE_PATH/metadata"
+	STORAGE_METADATA_PATH="$SERVICE_FOLDER/metadata"
 	APP_PATH="$SERVICE_FOLDER/app"
 	APP_BIN_PATH="$APP_PATH/bin"
 	MODEL_PATH="$SERVICE_FOLDER/model"
