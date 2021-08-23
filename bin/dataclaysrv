@@ -438,10 +438,16 @@ function clean {
 # ==================== SERVICES ============================ #
 
 function prepare_available_ports {
+  DSNODES=${HOSTS[@]:2}  # DS nodes
+  NUM_HOSTS=0
+  for node in ${HOSTS[@]}; do NUM_HOSTS=$(($NUM_HOSTS + 1)) ; done
+  NUM_DSNODES=$(( $NUM_HOSTS - 2 ))
+  JAVA_SL_NUM=$(($JAVA_SL_PER_NODE * $NUM_DSNODES))
+
   # Set available ports
   if [ -z "$AVAILABLE_PORTS" ]; then
     AVAILABLE_PORTS=(1111)
-    for j in $(seq 1 $JAVA_SL_PER_NODE); do
+    for j in $(seq 1 $JAVA_SL_NUM); do
         JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
         AVAILABLE_PORTS=(${AVAILABLE_PORTS[@]} $JAVA_PORT)
         for k in $(seq 1 $PYTHON_EE_PER_SL); do
@@ -460,9 +466,6 @@ function prepare_available_ports {
   done
   echo ""
   # check available ports size
-  DSNODES=${HOSTS[@]:2}  # DS nodes
-  NUM_DSNODES=${#DSNODES[@]}
-  JAVA_SL_NUM=$(($JAVA_SL_PER_NODE * $NUM_DSNODES))
   EXPECTED_PORTS=$((1 + $JAVA_SL_NUM + $PYTHON_EE_PER_SL * $JAVA_SL_NUM))
   NUM_PORTS=${#AVAILABLE_PORTS[@]}
   if [ "$NUM_PORTS" -ne "$EXPECTED_PORTS" ]; then
