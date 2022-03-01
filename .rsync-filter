@@ -1,12 +1,5 @@
-- *.pyc
-- *.pyo
-- __pycache__/
+- .git
 - .gitignore
-- /.idea/
 - /.vscode/
-- /.pyenv*/
-- /venv/
-- .dockerignore
-- *latest*
-- *_pb2*
-- *.sif
+- /javaclay/
+- /pyclay/
