@@ -239,8 +239,10 @@ function deploy {
 	create_script $DEPLOY_SCRIPT 	
 	
 	# link to singularity images in frontend (for shared fs)
+	# ??? Remove it ???
 	link_singularity
-	
+
+	# ??? Remove it ???
 	generate_env_file $SERVICENAME $DEPLOY_SCRIPT 	
 	# -B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh
 	
@@ -437,11 +439,18 @@ function clean {
 
 # ==================== SERVICES ============================ #
 
+#=== FUNCTION ================================================================
+# NAME: prepare_available_ports
+# DESCRIPTION: Create an array of ports for each service depending on the 
+# 				number of nodes. It may be not necessary.
+# PARAMETER 1: ---
+# OUTPUT: AVAILABLE_PORTS, JAVA_PORT, JAVA_PORT, LOGICMODULE_PORT
+#=============================================================================
 function prepare_available_ports {
   DSNODES=${HOSTS[@]:2}  # DS nodes
   NUM_HOSTS=0
   for node in ${HOSTS[@]}; do NUM_HOSTS=$(($NUM_HOSTS + 1)) ; done
-  NUM_DSNODES=$(( $NUM_HOSTS - 2 ))
+  NUM_DSNODES=$(( $NUM_HOSTS - 2 )) #??? Wht -2 ??? !!! One for client, one for Logic Module.
   JAVA_SL_NUM=$(($JAVA_SL_PER_NODE * $NUM_DSNODES))
 
   # Set available ports
@@ -475,10 +484,10 @@ function prepare_available_ports {
 
 function dataclaydeploy { 
 	
-	dataclayclean
+	dataclayclean #??? Why is removed in DevelAlex ???
   dataclaywarn "Job was not deployed. Going to deploy."
 	dataclayinfo "========== Deploying dataClay =========="
-  prepare_available_ports
+  prepare_available_ports #??? Why is removed in DevelAlex ???
 
 	dataclayecho "- deploying to hosts = \"$HOSTS\""
 	HOSTS=($(echo $HOSTS | tr " " "\n"))
@@ -496,6 +505,7 @@ function dataclaydeploy {
 	fi
 	create_globaljob_config
 
+	#??? Should i Clean like Alex ???
 	deploy $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
 	i=1
 	wait_pids=()
@@ -675,6 +685,7 @@ function dataclayclean {
 		
 	# stop all remaining instances in current node (for localhost) 
 	# if singularity is installed locally: 
+	#??? Remove it ???
 	if hash singularity 2>/dev/null; then
 		if [[ $(singularity instance list | wc -l) -gt 1 ]]; then 
 			singularity instance stop -a	
@@ -703,7 +714,7 @@ else
 	dataclayerr "First argument must be start or stop"
 fi 
 # Check DATACLAY_BASE is set 
-SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" #!!! /apps/DATACLAY/DevelMarc/bin
 DATACLAY_BASE=$SCRIPTDIR/..
 #if [ -z $DATACLAY_BASE ]; then
 #        dataclayerr "Please set DATACLAY_BASE in your host (via bashrc, ...)!"
@@ -788,11 +799,12 @@ JAVA_SL_PER_NODE=1
 PYTHON_EE_PER_SL=1
 JAVA_DS_BASE_PORT=2222
 PYTHON_DS_BASE_PORT=2666
-SINGULARITY_IMAGES_HOME=$DATACLAY_BASE/singularity/images/
+SINGULARITY_IMAGES_HOME=$DATACLAY_BASE/singularity/images #??? Remove singularity ???
 LOG4J_CONFIG=$DATACLAY_BASE/logging/info.xml
 DEBUG=False
 HOSTS="localhost localhost localhost" 
 
+# ??? Remove all Container variables ???
 #### DATACLAY ENV. VARIABLES THAT MIGHT BE AFFECTED BY HOST ENVIRONMENT #####
 ### WARNING: THESE VARIABLES ARE DEFINED IN DOCKERFILES 
 CONTAINER_DATACLAY_JAR="/home/dataclayusr/dataclay/dataclay.jar"
@@ -819,6 +831,7 @@ PYCLAY_PATH=""
 ###############################################################
 
 ###############################################################
+# ??? Remove binds ???
 # Binds
 DATACLAY_BIND=""
 if [ ! -z "$DATACLAY_EXT_BIND" ]; then 
@@ -831,7 +844,7 @@ if [ ! -z "$DATACLAY_EXT_BIND" ]; then
 fi
 ###############################################################
 # Extrae 
-
+# ??? Remove or change path ???
 PYCLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB
 JAVACLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB
 EXTRAE_CONFIG_FILE=$CONTAINER_EXTRAE_CONFIG_FILE
@@ -859,7 +872,7 @@ do
 				PYCLAY_PATH=$1
 				dataclayecho "- using pyclay path $PYCLAY_PATH"
 		    	;;
-		    --available-ports)
+		    --available-ports) #??? Should i delete it ???
 		      shift
 		      AVAILABLE_PORTS=$1
 		      AVAILABLE_PORTS=($(echo $AVAILABLE_PORTS | tr " " "\n"))
@@ -956,6 +969,7 @@ do
     shift
 done
 
+# ??? Que es esto ??? Parece que PROLOG_SCRIPT solo tiene un espacio..
 if [ ! -f $PROLOG_SCRIPT ]; then 
 	dataclayerr "Prolog $PROLOG_SCRIPT not found."
 fi
