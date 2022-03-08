@@ -255,12 +255,6 @@ function deploy {
 	echo "mkdir -p $STORAGE_PATH" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $STORAGE_METADATA_PATH" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $SERVICE_FOLDER/images/" >> $DEPLOY_SCRIPT
-	echo "rm -rf \$HOME/.singularity/instances/logs" >> $DEPLOY_SCRIPT
-	echo "if [ ! -f $SERVICE_FOLDER/images/Singularity ]; then touch $SERVICE_FOLDER/images/Singularity; fi" >> $DEPLOY_SCRIPT
-	echo "if [ ! -f $SERVICE_FOLDER/images/${IMAGE}.sif ]; then
-		singularity pull $SERVICE_FOLDER/images/${IMAGE}.sif docker://bscdataclay/${IMAGE};
-	fi" >> $DEPLOY_SCRIPT
-	echo "singularity exec $DATACLAY_BIND -B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh $SERVICE_FOLDER/images/${IMAGE}.sif env > $SERVICE_FOLDER/container.environment"	>> $DEPLOY_SCRIPT
 	
 	chmod +x $DEPLOY_SCRIPT
 	if [ $SHARED_FS == true ]; then
@@ -318,10 +312,8 @@ function deploy_client {
 	generate_env_file $SERVICENAME $RUN_SCRIPT
 	
 	echo "cd $APP_PATH"  >> $RUN_SCRIPT
-	echo "singularity \$1 -B $SERVICE_FOLDER/cfgfiles/log4j2.xml:/home/dataclayusr/dataclay/logging/log4j2.xml \
-			$DATACLAY_BIND -B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh \
-			$SERVICE_FOLDER/images/${IMAGE}.sif \${@:2}" >> $RUN_SCRIPT
-	
+	echo "$DATACLAY_BASE/scripts/dataclaycmd.sh \${@:2}" >> $RUN_SCRIPT
+
 	chmod +x $RUN_SCRIPT
 	if [ $SHARED_FS == true ]; then
 		mkdir -p $SERVICE_FOLDER
@@ -490,9 +482,9 @@ function prepare_available_ports {
 function dataclaydeploy { 
 	
 	dataclayclean #??? Why is removed in DevelAlex ???
-  dataclaywarn "Job was not deployed. Going to deploy."
+	dataclaywarn "Job was not deployed. Going to deploy."
 	dataclayinfo "========== Deploying dataClay =========="
-  prepare_available_ports #??? Why is removed in DevelAlex ???
+	prepare_available_ports #??? Why is removed in DevelAlex ???
 
 	dataclayecho "- deploying to hosts = \"$HOSTS\""
 	HOSTS=($(echo $HOSTS | tr " " "\n"))
@@ -554,7 +546,7 @@ function dataclaystart {
 	fi
 
 	dataclayinfo "========== Starting dataClay ========== "
-  prepare_available_ports
+	prepare_available_ports
 	# Get client config to get DS nodes and LM node
 	source $GLOBAL_JOB_CONFIG
 	start $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
@@ -570,8 +562,8 @@ function dataclaystart {
 			wait_pids+=($!)
 			for k in $(seq 1 $PYTHON_EE_PER_SL); do
 				PYTHON_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
-			  current_available_port_idx=$((current_available_port_idx + 1))
-			  node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
+				current_available_port_idx=$((current_available_port_idx + 1))
+				node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
 				SERVICENAME=dspython${i}_${node_index}
 				start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX $JAVA_PORT $PYTHON_PORT &
 				wait_pids+=($!)
@@ -591,23 +583,24 @@ function dataclaystart {
 	
 	# Wait for backends 
 	for DSNODE in $DSNODES; do
-	   DSCOUNTER=0
-	   dataclayecho "Waiting for $DSNODE Java execution environments to be ready... "
+		DSCOUNTER=0
+		dataclayecho "Waiting for $DSNODE Java execution environments to be ready... "
 	   
-	   while [ $DSCOUNTER -lt $JAVA_SL_PER_NODE ]; do
-	       $SCRIPTDIR/dataclay GetBackends admin admin java
-	       DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin java | grep "${DSNAME_PREFIX}" | wc -l`
-		   sleep 5
-	   done
-	   dataclayecho "$DSNODE Java execution environments are ready"
+		while [ $DSCOUNTER -lt $JAVA_SL_PER_NODE ]; do
+	    	$SCRIPTDIR/dataclay GetBackends admin admin java
+	    	DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin java | grep "${DSNAME_PREFIX}" | wc -l`
+			sleep 5
+		done
+		dataclayecho "$DSNODE Java execution environments are ready"
 	
-	   DSCOUNTER=0
-	   dataclayecho "Waiting for $DSNODE Python execution environments to be ready... "
-	   TOTAL_PYTHON_PER_NODE=$(( $PYTHON_EE_PER_SL * $JAVA_SL_PER_NODE ))
-	   while [ $DSCOUNTER -lt $TOTAL_PYTHON_PER_NODE ]; do
-	       DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin python | grep "${DSNAME_PREFIX}" | wc -l`
-	   done
-	   dataclayecho "$DSNODE Python execution environments are ready"
+		DSCOUNTER=0
+		dataclayecho "Waiting for $DSNODE Python execution environments to be ready... "
+		TOTAL_PYTHON_PER_NODE=$(( $PYTHON_EE_PER_SL * $JAVA_SL_PER_NODE ))
+		while [ $DSCOUNTER -lt $TOTAL_PYTHON_PER_NODE ]; do
+	   		dataclayecho "`$SCRIPTDIR/dataclay GetBackends admin admin python`"
+			DSCOUNTER=`$SCRIPTDIR/dataclay GetBackends admin admin python | grep "${DSNAME_PREFIX}" | wc -l`
+		done
+		dataclayecho "$DSNODE Python execution environments are ready"
 	done
 	
 	dataclayinfo "========== dataClay started! ========== "
@@ -719,7 +712,7 @@ else
 	dataclayerr "First argument must be start or stop"
 fi 
 # Check DATACLAY_BASE is set 
-SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )" #!!! /apps/DATACLAY/DevelMarc/bin
+SCRIPTDIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 DATACLAY_BASE=$SCRIPTDIR/..
 #if [ -z $DATACLAY_BASE ]; then
 #        dataclayerr "Please set DATACLAY_BASE in your host (via bashrc, ...)!"
@@ -776,7 +769,7 @@ fi
 DEPLOYED=false
 while IFS= read -r line; do
   if [ "$line" == "$DATACLAY_JOBID" ]; then
-  	 DEPLOYED=true
+  		DEPLOYED=true
   fi
 done < "$DEPLOYED_DATACLAY_JOBS"
 
