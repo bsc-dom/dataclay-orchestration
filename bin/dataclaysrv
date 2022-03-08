@@ -362,12 +362,17 @@ function start {
 	echo "echo \"Starting ${SERVICENAME}\"" >> $RUN_SCRIPT
 	echo "mkdir -p $SERVICE_FOLDER/logs/" >> $RUN_SCRIPT
 
-	echo "singularity instance start -B $SERVICE_FOLDER/cfgfiles/log4j2.xml:/home/dataclayusr/dataclay/logging/log4j2.xml \
-		-B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh \
-		$DATACLAY_BIND \
-		$SERVICE_FOLDER/images/${IMAGE}.sif ${SERVICENAME}" >> $RUN_SCRIPT
-	echo "nohup singularity run instance://${SERVICENAME} $FLAGS >${LOG_DIR}/${SERVICENAME}.out 2>${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
-		
+	if [[ $IMAGE == dspython* ]]; then
+		number=$(cut -d'_' -f 2 <<< $SERVICENAME)
+        numa_idx=$(( ($number - 1) ))
+		echo "Going to issue the following command: \`numactl -N ${numa_idx} -m ${numa_idx}\`"
+		echo "nohup numactl -N ${numa_idx} -m ${numa_idx} -- python -m dataclay.executionenv.server --service >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
+	elif [[ $IMAGE == dsjava* ]]; then
+		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -cp "$DATACLAY_JAR" es.bsc.dataclay.dataservice.server.DataServiceSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
+	else
+		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -cp "$DATACLAY_JAR" es.bsc.dataclay.logic.server.LogicModuleSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
+	fi	
+
 		
 	chmod +x $RUN_SCRIPT
 	if [ $SHARED_FS == true ]; then
@@ -826,8 +831,8 @@ CONTAINER_EXTRAE_CONFIG_FILE="/home/dataclayusr/dataclay/extrae/extrae_basic.xml
 
 #### PRIORITY PATHS #####
 # Following paths are prepended (not like container paths)  
-DATACLAY_JAR=$CONTAINER_DATACLAY_JAR #must be defined since it is used to compile models (see dataclayprepare or javaclay)
-PYCLAY_PATH="" 
+# DATACLAY_JAR=$CONTAINER_DATACLAY_JAR #must be defined since it is used to compile models (see dataclayprepare or javaclay)
+# PYCLAY_PATH="" 
 ###############################################################
 
 ###############################################################
