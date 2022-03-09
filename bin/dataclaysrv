@@ -88,17 +88,16 @@ function create_service_config {
 	echo "export MODEL_PATH=$MODEL_PATH" >> $SERVICE_CONFIG
 	echo "export MODEL_BIN_PATH=$MODEL_BIN_PATH" >> $SERVICE_CONFIG
 	echo "export STUBS_PATH=$STUBS_PATH" >> $SERVICE_CONFIG
-	echo "export CONTAINER_ENTRYPOINTS=$CONTAINER_ENTRYPOINTS" >> $SERVICE_CONFIG
 	
 	##### PATHS, PYTHONPATHS, ... 
 	# PATH order: orchestration node path (for propagation), node path, dataclay path 
 	# PYTHONPATH order: orchestration node pythonpath (for propagation), node pythonpath, dataclay pythonpath 
 	# LD_LIBRARY_PATH order: same...
 	
-	echo "export PATH=$PATH:\$PATH:$CONTAINER_PATH" >> $SERVICE_CONFIG
-    echo "export PYTHONPATH=$PYCLAY_PATH:$PYTHONPATH:\$PYTHONPATH:$CONTAINER_PYTHONPATH"  >> $SERVICE_CONFIG
-    echo "export LD_LIBRARY_PATH=$DATACLAY_EXT_BIND:$LD_LIBRARY_PATH:\$LD_LIBRARY_PATH:$CONTAINER_LD_LIBRARY_PATH" >> $SERVICE_CONFIG
-    echo "export CLASSPATH=$DATACLAY_JAR:$CLASSPATH:\$CLASSPATH:$CONTAINER_CLASSPATH" >> $SERVICE_CONFIG
+	echo "export PATH=$PATH:\$PATH" >> $SERVICE_CONFIG
+    echo "export PYTHONPATH=$PYCLAY_PATH:$PYTHONPATH:\$PYTHONPATH:"  >> $SERVICE_CONFIG
+    echo "export LD_LIBRARY_PATH=$DATACLAY_EXT_BIND:$LD_LIBRARY_PATH:\$LD_LIBRARY_PATH" >> $SERVICE_CONFIG
+    echo "export CLASSPATH=$DATACLAY_JAR:$CLASSPATH:\$CLASSPATH" >> $SERVICE_CONFIG
 	echo "export DATACLAY_JAR=$DATACLAY_JAR" >> $SERVICE_CONFIG
 	echo "################" >> $SERVICE_CONFIG
 
@@ -122,21 +121,6 @@ function create_service_config {
 
 	
 }
-
-function generate_env_file {
-
-	# Special environment variables that Singularity ignores from the host like LD_LIBRARY_PATH
-	# must be set here. 
-	ENV_FILE=$SERVICE_FOLDER/env_"$1".sh
-	CUR_SCRIPT=$2
-	
-	echo "echo \"export PATH=\$PATH\" > $ENV_FILE" >> $CUR_SCRIPT
-    #echo "echo \"export PYTHONPATH=$PYTHONPATH\" >> $ENV_FILE" >> $CUR_SCRIPT
-    echo "echo \"export LD_PRELOAD=$CONTAINER_LD_PRELOAD\" >> $ENV_FILE" >> $CUR_SCRIPT
-    echo "echo \"export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH\" >> $ENV_FILE" >> $CUR_SCRIPT
-    #echo "echo \"export CLASSPATH=$CLASSPATH\" >> $ENV_FILE" >> $CUR_SCRIPT
-}
-
 
 function create_script { 
 	# FIXME: SERVICE_CONFIG is a pseudo-global unsafe variable
@@ -193,42 +177,16 @@ function generate_session_properties {
 	fi
 }
 
-function link_singularity {
-	#### create link to singularity images for using it in frontend (or for backends without internet access and shared FS)
-	SINGULARITY_SERVICE_FOLDER=$DATACLAY_JOB_FOLDER/$SERVICENAME/images
-	mkdir -p $SINGULARITY_SERVICE_FOLDER
-	touch $SINGULARITY_SERVICE_FOLDER/Singularity
-	ln -s $SINGULARITY_IMAGES_HOME/${IMAGE}.sif  $SINGULARITY_SERVICE_FOLDER/${IMAGE}.sif
-}
-
-#=== FUNCTION ================================================================
-# NAME: get_container_version
-# DESCRIPTION: Get container version
-# PARAMETER 1: Execution environment version i.e. can be python py3.6 or jdk8
-#===============================================================================
-function get_container_version { 
-	EE_VERSION=$1
-	DATACLAY_EE_VERSION="${EE_VERSION//./}"
-	if [[ $DATACLAY_VERSION == *".dev"* ]]; then
-  		VERSION_WITHOUT_DEV="${DATACLAY_VERSION//.dev/}"
-		DATACLAY_CONTAINER_VERSION="${VERSION_WITHOUT_DEV}.${DATACLAY_EE_VERSION}.dev"
-  	else 
-  		DATACLAY_CONTAINER_VERSION="$DATACLAY_VERSION.${DATACLAY_EE_VERSION}"
-	fi
-	echo ${DATACLAY_CONTAINER_VERSION}
-}
-
 # ===================== DEPLOYMENT SCRIPTS ======================================= #
 
 function deploy { 
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
-	IMAGE=$4 #service image name (logicmodule, dsjava.2.X.jdk11.dev, dspython.2.X.py37, client) 
 	
 	# The caller should provide both the JAVA_PORT and PYTHON_PORT
-	JAVA_PORT=$5
-	PYTHON_PORT=$6
+	JAVA_PORT=$4
+	PYTHON_PORT=$5
 	# Both are required for Python dataservices (as the JAVA_PORT is the StorageLocation,
 	# i.e. the Java backend to which Python will connect).
 	# Java dataservices only require the JAVA_PORT
@@ -238,14 +196,6 @@ function deploy {
 	DEPLOY_SCRIPT=$(mktemp /tmp/${DATACLAY_JOBID}_${SERVICENAME}_deploy.XXXX)
 	create_script $DEPLOY_SCRIPT 	
 	
-	# link to singularity images in frontend (for shared fs)
-	# ??? Remove it ???
-	link_singularity
-
-	# ??? Remove it ???
-	generate_env_file $SERVICENAME $DEPLOY_SCRIPT 	
-	# -B $SERVICE_FOLDER/env_$SERVICENAME.sh:/.singularity.d/env/env.sh
-	
 	####### DEPLOY SCRIPT ####### 
 	# prepare paths
 	echo "mkdir -p $SERVICE_FOLDER" >> $DEPLOY_SCRIPT
@@ -254,7 +204,6 @@ function deploy {
 	echo "mkdir -p $DEPLOY_PATH_SRC" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $STORAGE_PATH" >> $DEPLOY_SCRIPT
 	echo "mkdir -p $STORAGE_METADATA_PATH" >> $DEPLOY_SCRIPT
-	echo "mkdir -p $SERVICE_FOLDER/images/" >> $DEPLOY_SCRIPT
 	
 	chmod +x $DEPLOY_SCRIPT
 	if [ $SHARED_FS == true ]; then
@@ -281,7 +230,6 @@ function deploy_client {
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
-	IMAGE=$4 #service image name (logicmodule, dsjava.2.X.jdk11.dev, dspython.2.X.py37, client) 
 	
 	# Note that client deployment does not use/need neither JAVA_PORT nor PYTHON_PORT
 
@@ -309,7 +257,7 @@ function deploy_client {
 	# Generate session.properties. If --tracing was provided, add session.properties field. 
 	generate_session_properties
 	
-	generate_env_file $SERVICENAME $RUN_SCRIPT
+	# generate_env_file $SERVICENAME $RUN_SCRIPT
 	
 	echo "cd $APP_PATH"  >> $RUN_SCRIPT
 	echo "$DATACLAY_BASE/scripts/dataclaycmd.sh \${@:2}" >> $RUN_SCRIPT
@@ -332,11 +280,10 @@ function start {
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name
-	IMAGE=$4 #service (logicmodule, dsjava, dspython, client) 
 	
 	# The caller should provide both the JAVA_PORT and PYTHON_PORT
-	JAVA_PORT=$5
-	PYTHON_PORT=$6
+	JAVA_PORT=$4
+	PYTHON_PORT=$5
 	# Both are required for Python dataservices (as the JAVA_PORT is the StorageLocation,
 	# i.e. the Java backend to which Python will connect).
 	# Java dataservices only require the JAVA_PORT
@@ -354,12 +301,12 @@ function start {
 	echo "echo \"Starting ${SERVICENAME}\"" >> $RUN_SCRIPT
 	echo "mkdir -p $SERVICE_FOLDER/logs/" >> $RUN_SCRIPT
 
-	if [[ $IMAGE == dspython* ]]; then
+	if [[ $SERVICENAME == dspython* ]]; then
 		number=$(cut -d'_' -f 2 <<< $SERVICENAME)
         numa_idx=$(( ($number - 1) ))
 		echo "Going to issue the following command: \`numactl -N ${numa_idx} -m ${numa_idx}\`"
 		echo "nohup numactl -N ${numa_idx} -m ${numa_idx} -- python -m dataclay.executionenv.server --service >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
-	elif [[ $IMAGE == dsjava* ]]; then
+	elif [[ $SERVICENAME == dsjava* ]]; then
 		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -cp "$DATACLAY_JAR" es.bsc.dataclay.dataservice.server.DataServiceSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 	else
 		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -cp "$DATACLAY_JAR" es.bsc.dataclay.logic.server.LogicModuleSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
@@ -389,7 +336,6 @@ function stop {
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
-	IMAGE=$4 #service image name (logicmodule, dsjava.2.X.jdk11.dev, dspython.2.X.py37, client) 
 	
 	create_service_config
 	
@@ -398,12 +344,9 @@ function stop {
 	create_script $STOP_SCRIPT
 	
 	SIGNAL="SIGTERM"
-	if [[ $IMAGE == "dspython"* ]]; then 
+	if [[ $SERVICENAME == "dspython"* ]]; then 
 		SIGNAL="SIGINT"
 	fi 
-	echo "if singularity instance list | grep $SERVICENAME; then" >>  $STOP_SCRIPT
-	echo "singularity instance stop -s $SIGNAL -t $SHUTDOWN_TIMEOUT $SERVICENAME" >> $STOP_SCRIPT
-	echo "fi" >> $STOP_SCRIPT
 
 	chmod +x $STOP_SCRIPT
 	if [ $SHARED_FS == true ]; then
@@ -495,15 +438,10 @@ function dataclaydeploy {
 	LMNODE=${HOSTS[1]}     #2nd node for LM
 	DSNODES=${HOSTS[@]:2}  # DS nodes
 
-	# Check if Singularity images exist 
-	if [ ! -d "$SINGULARITY_IMAGES_HOME" ]; then 
-		dataclaywarn "Singularity images not found at $SINGULARITY_IMAGES_HOME. Make sure installation was correct."
-		exit 1
-	fi
 	create_globaljob_config
 
 	#??? Should i Clean like Alex ???
-	deploy $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
+	deploy $LMNODE ${LM_HOSTID} logicmodule
 	i=1
 	wait_pids=()
 	current_available_port_idx=1
@@ -512,14 +450,14 @@ function dataclaydeploy {
 			SERVICENAME=dsjava${i}_${j}
 			JAVA_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
 			current_available_port_idx=$((current_available_port_idx + 1))
-			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX $JAVA_PORT &
+			deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME $JAVA_PORT &
 			wait_pids+=($!)
 			for k in $(seq 1 $PYTHON_EE_PER_SL); do
 				PYTHON_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
 				current_available_port_idx=$((current_available_port_idx + 1))
 				node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
 				SERVICENAME=dspython${i}_${node_index}
-				deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX $JAVA_PORT $PYTHON_PORT &
+				deploy $NODE ${DSNAME_PREFIX}${i} $SERVICENAME $JAVA_PORT $PYTHON_PORT &
 				wait_pids+=($!)
 			done
 		done 
@@ -549,7 +487,7 @@ function dataclaystart {
 	prepare_available_ports
 	# Get client config to get DS nodes and LM node
 	source $GLOBAL_JOB_CONFIG
-	start $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
+	start $LMNODE ${LM_HOSTID} logicmodule
 	i=1
 	wait_pids=()
 	current_available_port_idx=1
@@ -558,14 +496,14 @@ function dataclaystart {
 			SERVICENAME=dsjava${i}_${j}
 			JAVA_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
 			current_available_port_idx=$((current_available_port_idx + 1))
-			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX $JAVA_PORT &
+			start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME $JAVA_PORT &
 			wait_pids+=($!)
 			for k in $(seq 1 $PYTHON_EE_PER_SL); do
 				PYTHON_PORT=${AVAILABLE_PORTS[current_available_port_idx]}
 				current_available_port_idx=$((current_available_port_idx + 1))
 				node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
 				SERVICENAME=dspython${i}_${node_index}
-				start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX $JAVA_PORT $PYTHON_PORT &
+				start $NODE ${DSNAME_PREFIX}${i} $SERVICENAME $JAVA_PORT $PYTHON_PORT &
 				wait_pids+=($!)
 			done
 		done
@@ -621,12 +559,12 @@ function dataclaystop {
 		#### NOTE: stop first dspython
 		for j in $(seq 1 $JAVA_SL_PER_NODE); do
 			SERVICENAME=dsjava${i}_${j}
-			stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dsjava:$JAVA_CONTAINER_SUFFIX &
+			stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME &
 			wait_pids+=($!)
 			for k in $(seq 1 $PYTHON_EE_PER_SL); do
 				node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
 				SERVICENAME=dspython${i}_${node_index}
-				stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME dspython:$PYTHON_CONTAINER_SUFFIX &
+				stop $NODE ${DSNAME_PREFIX}${i} $SERVICENAME &
 				wait_pids+=($!)
 			done
 		done 
@@ -637,7 +575,7 @@ function dataclaystop {
 		wait $pid
 	done
 
-	stop $LMNODE ${LM_HOSTID} logicmodule logicmodule:$JAVA_CONTAINER_SUFFIX
+	stop $LMNODE ${LM_HOSTID} logicmodule
 	
 	dataclayinfo "========== dataClay stopped! ========== "
 }
@@ -679,15 +617,6 @@ function dataclayclean {
 		clean $LMNODE ${LM_HOSTID} logicmodule
 		clean $CLIENTNODE ${CLIENT_HOSTID} client
 		rm -rf $DATACLAY_JOB_FOLDER
-	fi
-		
-	# stop all remaining instances in current node (for localhost) 
-	# if singularity is installed locally: 
-	#??? Remove it ???
-	if hash singularity 2>/dev/null; then
-		if [[ $(singularity instance list | wc -l) -gt 1 ]]; then 
-			singularity instance stop -a	
-		fi
 	fi
 	
 	dataclayinfo "========== dataClay cleaned! ========== "
@@ -789,63 +718,20 @@ DATACLAY_PWD=bsc_user
 DATACLAY_DATASET=bsc_dataset
 DATACLAY_JAVA_VERSION=8
 DATACLAY_PYTHON_VERSION=3.7
-JAVA_CONTAINER_SUFFIX=$(get_container_version jdk$DATACLAY_JAVA_VERSION)
-PYTHON_CONTAINER_SUFFIX=$(get_container_version py$DATACLAY_PYTHON_VERSION)
 SHARED_FS=FALSE
 EXTRAE_STARTING_TASK_ID=0
 JAVA_SL_PER_NODE=1
 PYTHON_EE_PER_SL=1
 JAVA_DS_BASE_PORT=2222
 PYTHON_DS_BASE_PORT=2666
-SINGULARITY_IMAGES_HOME=$DATACLAY_BASE/singularity/images #??? Remove singularity ???
 LOG4J_CONFIG=$DATACLAY_BASE/logging/info.xml
 DEBUG=False
 HOSTS="localhost localhost localhost" 
 
-# ??? Remove all Container variables ???
-#### DATACLAY ENV. VARIABLES THAT MIGHT BE AFFECTED BY HOST ENVIRONMENT #####
-### WARNING: THESE VARIABLES ARE DEFINED IN DOCKERFILES 
-CONTAINER_DATACLAY_JAR="/home/dataclayusr/dataclay/dataclay.jar"
-CONTAINER_ENTRYPOINTS="/home/dataclayusr/dataclay/entrypoints"
-CONTAINER_VIRTUALENV="/home/dataclayusr/dataclay/dataclay_venv"
-CONTAINER_EXTRAE_HOME="/home/dataclayusr/.extrae/"
-CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB="/home/dataclayusr/dataclay/pyextrae/pyclay_extrae_wrapper.so"
-CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB="/home/dataclayusr/dataclay/javaextrae/javaclay_extrae_wrapper.so"
-CONTAINER_PATH="${CONTAINER_VIRTUALENV}/bin:${CONTAINER_ENTRYPOINTS}:${CONTAINER_EXTRAE_HOME}/bin"
-CONTAINER_PYCLAY_PATH="${CONTAINER_VIRTUALENV}/lib/python${DATACLAY_PYTHON_VERSION}/site-packages"
-CONTAINER_PYTHONPATH="${CONTAINER_PYCLAY_PATH}:${CONTAINER_EXTRAE_HOME}/libexec:${CONTAINER_EXTRAE_HOME}/lib"
-CONTAINER_LD_LIBRARY_PATH="${CONTAINER_EXTRAE_HOME}/lib"
-CONTAINER_LD_PRELOAD="${CONTAINER_EXTRAE_HOME}/lib/libpttrace.so"
-CONTAINER_CLASSPATH="${CONTAINER_DATACLAY_JAR}"
-CONTAINER_EXTRAE_SKIP_AUTO_LIBRARY_INITIALIZE=1
-CONTAINER_EXTRAE_CONFIG_FILE="/home/dataclayusr/dataclay/extrae/extrae_basic.xml"
-###############################################################
-
-
-#### PRIORITY PATHS #####
-# Following paths are prepended (not like container paths)  
-# DATACLAY_JAR=$CONTAINER_DATACLAY_JAR #must be defined since it is used to compile models (see dataclayprepare or javaclay)
-# PYCLAY_PATH="" 
-###############################################################
-
-###############################################################
-# ??? Remove binds ???
-# Binds
-DATACLAY_BIND=""
-if [ ! -z "$DATACLAY_EXT_BIND" ]; then 
-	IFS=':' read -r -a DATACLAY_BIND_ARR <<< "$DATACLAY_EXT_BIND"
-	for MOUNT_POINT in "${DATACLAY_BIND_ARR[@]}"; do
-		DATACLAY_BIND="$DATACLAY_BIND -B $MOUNT_POINT:$MOUNT_POINT"
-	done
-	dataclayecho "- specified binding for singularity containers: $DATACLAY_BIND"
-	
-fi
-###############################################################
 # Extrae 
-# ??? Remove or change path ???
-PYCLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB
-JAVACLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB
-EXTRAE_CONFIG_FILE=$CONTAINER_EXTRAE_CONFIG_FILE
+# PYCLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB
+# JAVACLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB
+# EXTRAE_CONFIG_FILE=$CONTAINER_EXTRAE_CONFIG_FILE
 ###############################################################
 
 # Start args
@@ -871,29 +757,15 @@ do
 				dataclayecho "- using pyclay path $PYCLAY_PATH"
 		    	;;
 		    --available-ports) #??? Should i delete it ???
-		      shift
-		      AVAILABLE_PORTS=$1
-		      AVAILABLE_PORTS=($(echo $AVAILABLE_PORTS | tr " " "\n"))
-				  dataclayecho "- provided available ports $1"
-				  ;;
+				shift
+				AVAILABLE_PORTS=$1
+				AVAILABLE_PORTS=($(echo $AVAILABLE_PORTS | tr " " "\n"))
+				dataclayecho "- provided available ports $1"
+				;;
 			--python-ee-per-sl) 
 		    	shift 
 		    	PYTHON_EE_PER_SL=$1
 	            dataclayecho "- setting python execution environment per storage location = $PYTHON_EE_PER_SL"
-		    	;;
-		    --container-python-version) 
-		    	shift
-		    	DATACLAY_PYTHON_VERSION=$1
-				PYTHON_CONTAINER_SUFFIX=$(get_container_version py$DATACLAY_PYTHON_VERSION)
-		    	dataclayecho "- selected python version = $DATACLAY_PYTHON_VERSION"
-		    	dataclayecho "- python container suffix will be = $PYTHON_CONTAINER_SUFFIX"
-		    	;;
-		    --container-java-version) 
-		    	shift
-		    	DATACLAY_JAVA_VERSION=$1
-		    	JAVA_CONTAINER_SUFFIX=$(get_container_version jdk$DATACLAY_JAVA_VERSION)
-		    	dataclayecho "- selected java version = $DATACLAY_JAVA_VERSION"
-		    	dataclayecho "- java container suffix will be = $JAVA_CONTAINER_SUFFIX"
 		    	;;
 		    --pyclay-extrae-wrapper) 
 		    	shift
