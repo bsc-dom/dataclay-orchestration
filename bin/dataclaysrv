@@ -180,6 +180,7 @@ function generate_session_properties {
 # ===================== DEPLOYMENT SCRIPTS ======================================= #
 
 function deploy { 
+	start_deploy=$(date +%s.%3N)
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
@@ -223,7 +224,8 @@ function deploy {
 	# Clean temporary scripts
 	rm $DEPLOY_SCRIPT
 	
-	dataclayecho "${SERVICENAME} deployed to $HOSTNAME"
+	end_deploy=$(date +%s.%3N)
+	dataclayecho "${SERVICENAME} deployed to $HOSTNAME ($(echo "$end_deploy - $start_deploy" | bc -l) sec)"
 }
 
 function deploy_client { 
@@ -277,6 +279,7 @@ function deploy_client {
 }
 
 function start { 
+	start_start=$(date +%s.%3N)
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name
@@ -328,11 +331,13 @@ function start {
 		
 	# Clean temporary scripts
 	rm $RUN_SCRIPT
-
+	end_start=$(date +%s.%3N)
+	dataclayecho "${SERVICENAME} started in $HOSTNAME ($(echo "$end_start - $start_start" | bc -l) sec)"
 }
 
 # ===================== STOP SCRIPTS ======================================= #
 function stop { 
+	start_stop=$(date +%s.%3N)
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
@@ -362,9 +367,12 @@ function stop {
 	
 	# Clean temporary scripts
 	rm $STOP_SCRIPT
+	end_stop=$(date +%s.%3N)
+	dataclayecho "${SERVICENAME} stopped from $HOSTNAME ($(echo "$end_stop - $start_stop" | bc -l) sec)"
 }
 
 function clean { 
+	start_clean=$(date +%s.%3N)
 	HOSTNAME=$1
 	DATACLAY_HOST=$2 #dataclay host name (logicmodule, DS1, DS2, ...)
 	SERVICENAME=$3 #service name (logicmodule, dsjava1_1, dspython1_2, client, ...)
@@ -375,6 +383,9 @@ function clean {
 	else
 		echo "rm -rf $SERVICE_FOLDER" | ssh "${HOSTNAME}" bash -s
 	fi
+	
+	end_clean=$(date +%s.%3N)
+	dataclayecho "${SERVICENAME} cleaned from $HOSTNAME ($(echo "$end_clean - $start_clean" | bc -l) sec)"
 }
 
 # ==================== SERVICES ============================ #
@@ -387,43 +398,48 @@ function clean {
 # OUTPUT: AVAILABLE_PORTS, JAVA_PORT, JAVA_PORT, LOGICMODULE_PORT
 #=============================================================================
 function prepare_available_ports {
-  DSNODES=${HOSTS[@]:2}  # DS nodes
-  NUM_HOSTS=0
-  for node in ${HOSTS[@]}; do NUM_HOSTS=$(($NUM_HOSTS + 1)) ; done
-  NUM_DSNODES=$(( $NUM_HOSTS - 2 )) #??? Wht -2 ??? !!! One for client, one for Logic Module.
-  JAVA_SL_NUM=$(($JAVA_SL_PER_NODE * $NUM_DSNODES))
+	start_prepare_available_ports=$(date +%s.%3N)
+	DSNODES=${HOSTS[@]:2}  # DS nodes
+	NUM_HOSTS=0
+	for node in ${HOSTS[@]}; do NUM_HOSTS=$(($NUM_HOSTS + 1)) ; done
+	NUM_DSNODES=$(( $NUM_HOSTS - 2 )) #??? Wht -2 ??? !!! One for client, one for Logic Module.
+	JAVA_SL_NUM=$(($JAVA_SL_PER_NODE * $NUM_DSNODES))
 
-  # Set available ports
-  if [ -z "$AVAILABLE_PORTS" ]; then
-    AVAILABLE_PORTS=(1111)
-    for j in $(seq 1 $JAVA_SL_NUM); do
-        JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
-        AVAILABLE_PORTS=(${AVAILABLE_PORTS[@]} $JAVA_PORT)
-        for k in $(seq 1 $PYTHON_EE_PER_SL); do
-            node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
-            PYTHON_PORT=$(( $PYTHON_DS_BASE_PORT + $node_index ))
-            AVAILABLE_PORTS=(${AVAILABLE_PORTS[@]} $PYTHON_PORT)
-        done
-    done
-  fi
-  LOGICMODULE_PORT=${AVAILABLE_PORTS[0]}
-  # Iterate the loop to read and print each array element
-  printf "$PREFIX - using ports: "
-  for value in "${AVAILABLE_PORTS[@]}"
-  do
-       printf "$value "
-  done
-  echo ""
-  # check available ports size
-  EXPECTED_PORTS=$((1 + $JAVA_SL_NUM + $PYTHON_EE_PER_SL * $JAVA_SL_NUM))
-  NUM_PORTS=${#AVAILABLE_PORTS[@]}
-  if [ "$NUM_PORTS" -ne "$EXPECTED_PORTS" ]; then
-      dataclayerr "Available ports not sufficient. Expected $EXPECTED_PORTS ports but $NUM_PORTS were given: ${AVAILABLE_PORTS[@]}"
-  fi
+	# Set available ports
+	if [ -z "$AVAILABLE_PORTS" ]; then
+		AVAILABLE_PORTS=(1111)
+		for j in $(seq 1 $JAVA_SL_NUM); do
+			JAVA_PORT=$(( $JAVA_DS_BASE_PORT + j ))
+			AVAILABLE_PORTS=(${AVAILABLE_PORTS[@]} $JAVA_PORT)
+			for k in $(seq 1 $PYTHON_EE_PER_SL); do
+				node_index=$(( ($j - 1) * $PYTHON_EE_PER_SL + $k ))
+				PYTHON_PORT=$(( $PYTHON_DS_BASE_PORT + $node_index ))
+				AVAILABLE_PORTS=(${AVAILABLE_PORTS[@]} $PYTHON_PORT)
+			done
+		done
+	fi
+	LOGICMODULE_PORT=${AVAILABLE_PORTS[0]}
+	# Iterate the loop to read and print each array element
+	printf "$PREFIX - using ports: "
+	for value in "${AVAILABLE_PORTS[@]}"
+	do
+		printf "$value "
+	done
+	echo ""
+	# check available ports size
+	EXPECTED_PORTS=$((1 + $JAVA_SL_NUM + $PYTHON_EE_PER_SL * $JAVA_SL_NUM))
+	NUM_PORTS=${#AVAILABLE_PORTS[@]}
+	if [ "$NUM_PORTS" -ne "$EXPECTED_PORTS" ]; then
+		dataclayerr "Available ports not sufficient. Expected $EXPECTED_PORTS ports but $NUM_PORTS were given: ${AVAILABLE_PORTS[@]}"
+	fi
+	
+	end_prepare_available_ports=$(date +%s.%3N)
+	dataclayecho "Prepared available ports ($(echo "$end_prepare_available_ports - $start_prepare_available_ports" | bc -l) sec)"
 }
 
 function dataclaydeploy { 
-	
+	start_dataclaydeploy=$(date +%s.%3N)
+
 	dataclayclean #??? Why is removed in DevelAlex ???
 	dataclaywarn "Job was not deployed. Going to deploy."
 	dataclayinfo "========== Deploying dataClay =========="
@@ -472,10 +488,12 @@ function dataclaydeploy {
 	deploy_client $CLIENTNODE ${CLIENT_HOSTID} client client:$DATACLAY_VERSION
 
 	echo "$DATACLAY_JOBID" >> $DEPLOYED_DATACLAY_JOBS
-	dataclayinfo "========== dataClay deployed! =========="
+	end_dataclaydeploy=$(date +%s.%3N)
+	dataclayinfo "========== dataClay deployed! ========== ($(echo "$end_dataclaydeploy - $start_dataclaydeploy" | bc -l) sec)"
 }
 
 function dataclaystart { 
+	start_dataclaystart=$(date +%s.%3N)
 
 	if [ "$DEPLOYED" == false ]; then 
 		dataclaydeploy
@@ -541,11 +559,12 @@ function dataclaystart {
 		dataclayecho "$DSNODE Python execution environments are ready"
 	done
 	
-	dataclayinfo "========== dataClay started! ========== "
+	end_dataclaystart=$(date +%s.%3N)
+	dataclayinfo "========== dataClay started! ========== ($(echo "$end_dataclaystart - $start_dataclaystart" | bc -l) sec)"
 }
 
 function dataclaystop { 
-	
+	start_dataclaystop=$(date +%s.%3N)
 	dataclayinfo "========== Stopping dataClay ========== "
 
 	# ------------------------------ dataClay Job configuration -------------------------------------------
@@ -576,12 +595,13 @@ function dataclaystop {
 	done
 
 	stop $LMNODE ${LM_HOSTID} logicmodule
-	
-	dataclayinfo "========== dataClay stopped! ========== "
+	end_dataclaystop=$(date +%s.%3N)
+	dataclayinfo "========== dataClay stopped! ========== ($(echo "$end_dataclaystop - $start_dataclaystop" | bc -l) sec)"
 }
 
 
 function dataclayclean { 
+	start_dataclayclean=$(date +%s.%3N)
 	dataclayinfo "========== Cleaning dataClay ========== "
 
 	# remove from deployed.jobs
@@ -619,7 +639,8 @@ function dataclayclean {
 		rm -rf $DATACLAY_JOB_FOLDER
 	fi
 	
-	dataclayinfo "========== dataClay cleaned! ========== "
+	end_dataclayclean=$(date +%s.%3N)
+	dataclayinfo "========== dataClay cleaned! ========== ($(echo "$end_dataclayclean - $start_dataclayclean" | bc -l) sec)"
 	
 }
 
