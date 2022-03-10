@@ -61,8 +61,7 @@ if [ -z $DATACLAY_JOBID ]; then
 	fi
 fi 
 
-JOB_CONFIG="$HOME/.dataClay/$DATACLAY_JOBID/client.config"
-source $JOB_CONFIG
+source $HOME/.dataClay/$DATACLAY_JOBID/client.config
 
 # Source prolog script 
 if [ ! -z $PROLOG ]; then 
