@@ -750,9 +750,9 @@ DEBUG=False
 HOSTS="localhost localhost localhost" 
 
 # Extrae 
-# PYCLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_PYCLAY_EXTRAE_WRAPPER_LIB
-# JAVACLAY_EXTRAE_WRAPPER_LIB=$CONTAINER_JAVACLAY_EXTRAE_WRAPPER_LIB
-# EXTRAE_CONFIG_FILE=$CONTAINER_EXTRAE_CONFIG_FILE
+PYCLAY_EXTRAE_WRAPPER_LIB=$DATACLAY_BASE/extrae/pyextrae/pyclay_extrae_wrapper.so
+JAVACLAY_EXTRAE_WRAPPER_LIB=$DATACLAY_BASE/extrae/javaextrae/javaclay_extrae_wrapper.so
+EXTRAE_CONFIG_FILE=$DATACLAY_BASE/extrae/extrae_basic.xml
 ###############################################################
 
 # Start args
