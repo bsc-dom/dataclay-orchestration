@@ -4,7 +4,7 @@ To generate .so files in MareNostrum:
 
 Load extrae:
 ```bash
-module load extrae
+module load EXTRAE/3.5.4
 ```
 
 Compile javaextrae:
