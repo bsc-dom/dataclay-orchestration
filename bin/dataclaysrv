@@ -310,9 +310,9 @@ function start {
 		echo "Going to issue the following command: \`numactl -N ${numa_idx} -m ${numa_idx}\`"
 		echo "nohup numactl -N ${numa_idx} -m ${numa_idx} -- python -m dataclay.executionenv.server --service >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 	elif [[ $SERVICENAME == dsjava* ]]; then
-		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -cp "$DATACLAY_JAR" es.bsc.dataclay.dataservice.server.DataServiceSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
+		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -javaagent:/apps/DATACLAY/dependencies/aspectjweaver.jar -cp "$DATACLAY_JAR" es.bsc.dataclay.dataservice.server.DataServiceSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 	else
-		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -cp "$DATACLAY_JAR" es.bsc.dataclay.logic.server.LogicModuleSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
+		echo "nohup java -Dcom.google.inject.internal.cglib.$experimental_asm7=true -javaagent:/apps/DATACLAY/dependencies/aspectjweaver.jar -cp "$DATACLAY_JAR" es.bsc.dataclay.logic.server.LogicModuleSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 	fi	
 
 		
