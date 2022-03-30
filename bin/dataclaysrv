@@ -312,16 +312,18 @@ function start {
 	elif [[ $SERVICENAME == dsjava* ]]; then
 		ARGS=""
 		ARGS="$ARGS -Dlog4j.configurationFile=$SERVICE_FOLDER/cfgfiles/log4j2.xml"
-		ARGS="$ARGS -Dcom.google.inject.internal.cglib.$experimental_asm7=true"
+		ARGS="$ARGS -Dcom.google.inject.internal.cglib.\$experimental_asm7=true"
 		ARGS="$ARGS -javaagent:/apps/DATACLAY/dependencies/aspectjweaver.jar"
 		ARGS="$ARGS -Daj.weaving.verbose=false -Dorg.aspectj.weaver.showWeaveInfo=false"
+		echo "export LD_PRELOAD=${EXTRAE_HOME}/lib/libpttrace.so" >> $RUN_SCRIPT
 		echo "nohup java $ARGS -cp "$DATACLAY_JAR" es.bsc.dataclay.dataservice.server.DataServiceSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 	else
 		ARGS=""
 		ARGS="$ARGS -Dlog4j.configurationFile=$SERVICE_FOLDER/cfgfiles/log4j2.xml"
-		ARGS="$ARGS -Dcom.google.inject.internal.cglib.$experimental_asm7=true"
+		ARGS="$ARGS -Dcom.google.inject.internal.cglib.\$experimental_asm7=true"
 		ARGS="$ARGS -javaagent:/apps/DATACLAY/dependencies/aspectjweaver.jar"
 		ARGS="$ARGS -Daj.weaving.verbose=false -Dorg.aspectj.weaver.showWeaveInfo=false"
+		echo "export LD_PRELOAD=${EXTRAE_HOME}/lib/libpttrace.so" >> $RUN_SCRIPT
 		echo "nohup java $ARGS -cp "$DATACLAY_JAR" es.bsc.dataclay.logic.server.LogicModuleSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 	fi	
 
