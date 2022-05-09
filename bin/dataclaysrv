@@ -318,6 +318,7 @@ function start {
 		echo "export LD_PRELOAD=${EXTRAE_HOME}/lib/libpttrace.so" >> $RUN_SCRIPT
 		echo "nohup java $ARGS -cp "$DATACLAY_JAR" es.bsc.dataclay.dataservice.server.DataServiceSrv >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 	else
+		echo "nohup etcd --data-dir ${DATACLAY_JOB_FOLDER}/metadata.etcd --advertise-client-urls 'http://0.0.0.0:2379' --listen-client-urls 'http://0.0.0.0:2379' >${LOG_DIR}/${SERVICENAME}.out 2> ${LOG_DIR}/${SERVICENAME}.err &" >> $RUN_SCRIPT
 		ARGS=""
 		ARGS="$ARGS -Dlog4j.configurationFile=$SERVICE_FOLDER/cfgfiles/log4j2.xml"
 		ARGS="$ARGS -Dcom.google.inject.internal.cglib.\$experimental_asm7=true"

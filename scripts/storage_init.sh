@@ -105,8 +105,8 @@ if [[ $DATACLAYSRV_START_CMD == *"--tracing"* ]]; then
 		echo " [@storage_init.sh] **** Warning **** Found Extrae version $EXTRAE_VERSION "
 	fi
 	echo "[@storage_init.sh] INFO: Using Extrae version $EXTRAE_VERSION "
-	DATACLAYSRV_START_CMD="--pyclay-extrae-wrapper /apps/DATACLAY/dependencies/extrae_wrapper/lib/pyextrae/pyclay_extrae_wrapper${EXTRAE_VERSION}.so $DATACLAYSRV_START_CMD"
-	DATACLAYSRV_START_CMD="--javaclay-extrae-wrapper /apps/DATACLAY/dependencies/extrae_wrapper/lib/javaextrae/javaclay_extrae_wrapper${EXTRAE_VERSION}.so $DATACLAYSRV_START_CMD"
+	DATACLAYSRV_START_CMD="--pyclay-extrae-wrapper /apps/DATACLAY/dev-dependencies/extrae_wrapper/lib/pyextrae/pyclay_extrae_wrapper${EXTRAE_VERSION}.so $DATACLAYSRV_START_CMD"
+	DATACLAYSRV_START_CMD="--javaclay-extrae-wrapper /apps/DATACLAY/dev-dependencies/extrae_wrapper/lib/javaextrae/javaclay_extrae_wrapper${EXTRAE_VERSION}.so $DATACLAYSRV_START_CMD"
 	IFS=' ' read -r -a HOSTS_ARRAY <<< "$HOSTS"
 	COUNT=${#HOSTS_ARRAY[@]}
 	COUNT=$(expr $COUNT - 1)
