@@ -1,0 +1,257 @@
+#!/usr/bin/env python3
+
+import argparse
+import logging
+import os
+
+import grpc
+from fabric import Connection, ThreadingGroup
+
+logging.basicConfig()
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
+def start_etcd(c, env):
+    logger.info("Starting ETCD")
+
+    env["ETCD_HOST"] = c.host
+    env["ETCD_PORT"] = os.getenv("ETCD_PORT", 2379)
+
+    service_folder = env["DATACLAY_JOB_PATH"] + "/etcd"
+    os.makedirs(service_folder)
+
+    with c.cd(service_folder):
+        c.run(
+            f"etcd --data-dir metadata.etcd --advertise-client-urls 'http://0.0.0.0:{env['ETCD_PORT']}' --listen-client-urls 'http://0.0.0.0:{env['ETCD_PORT']}' &> $DATACLAY_LOG_PATH/etcd.out",
+            env=env,
+            asynchronous=True,
+        )
+
+
+def start_metadata_service(c, env):
+    logger.info("Starting MetadataService")
+
+    env["METADATA_SERVICE_HOST"] = c.host
+    env["METADATA_SERVICE_PORT"] = os.getenv("LOGICMODULE_PORT_TCP", 16587)
+
+    # Check that job environ is correct
+    if env["METADATA_SERVICE_HOST"] != os.environ["METADATA_SERVICE_HOST"]:
+        raise
+
+    service_folder = env["DATACLAY_JOB_PATH"] + "/metadata_service"
+    os.makedirs(service_folder)
+
+    prefix = ""
+    if env["TRACING"]:
+        prefix = "opentelemetry-instrument"
+        env["OTEL_SERVICE_NAME"] = "metadata-service"
+
+    with c.cd(service_folder):
+        c.run(
+            f"{prefix} python -m dataclay_mds.server &> $DATACLAY_LOG_PATH/mds.out",
+            env=env,
+            asynchronous=True,
+        )
+
+
+def start_logicmodule(c, env):
+    logger.info("Starting Logicmodule")
+
+    env["LOGICMODULE_HOST"] = c.host
+    env["LOGICMODULE_PORT_TCP"] = os.getenv("LOGICMODULE_PORT_TCP", 11034)
+
+    service_folder = env["DATACLAY_JOB_PATH"] + "/logicmodule"
+    os.makedirs(service_folder)
+
+    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"
+    env["STORAGE_PATH"] = service_folder + "/storage"
+
+    with c.cd(service_folder):
+        c.run(
+            "java -cp $DATACLAY_JAR es.bsc.dataclay.logic.server.LogicModuleSrv &> $DATACLAY_LOG_PATH/lm.out",
+            env=env,
+            asynchronous=True,
+        )
+
+
+def start_javaclay(c, env, num):
+    logger.info(f"Starting Javaclay {num}")
+
+    env["DATASERVICE_NAME"] = f"DS{num}"
+    env["DATASERVICE_JAVA_PORT_TCP"] = os.getenv("DATASERVICE_JAVA_PORT_TCP", 2127)
+    env["DATASERVICE_HOST"] = c.host  # Maybe is breaking things..
+
+    service_name = f"dsjava{num}"
+    service_folder = f"{env['DATACLAY_JOB_PATH']}/{service_name}"
+    os.makedirs(service_folder)
+
+    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"  # do we need?
+    env["STORAGE_PATH"] = service_folder + "/storage"  # do we need?
+
+    with c.cd(service_folder):
+        c.run(
+            f"java -Dlog4j.configurationFile=/apps/DATACLAY/DevelMarc/dataclay-common/cfglog/log4j2.xml -cp $DATACLAY_JAR es.bsc.dataclay.dataservice.server.DataServiceSrv &> $DATACLAY_LOG_PATH/{service_name}.out",
+            env=env,
+            asynchronous=True,
+        )
+
+
+def start_pyclay(c, env, num):
+    logger.info(f"Starting Pyclay {num}")
+
+    env["DATASERVICE_NAME"] = f"DS{num}"
+    env["DEPLOY_PATH_SRC"] = "."  # Dangerous relative path
+    env["DEPLOY_PATH"] = "."  # Dangerous relative path
+
+    service_name = f"dspython{num}"
+    service_folder = f"{env['DATACLAY_JOB_PATH']}/{service_name}"
+    os.makedirs(service_folder)
+
+    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"  # do we need?
+    env["STORAGE_PATH"] = service_folder + "/storage"  # do we need?
+
+    prefix = ""
+    if env["TRACING"]:
+        prefix = "opentelemetry-instrument"
+        env["OTEL_SERVICE_NAME"] = "pyclay"
+
+    with c.cd(service_folder):
+        c.run(
+            f"{prefix} python -u -m dataclay.executionenv.server &> $DATACLAY_LOG_PATH/{service_name}.out",
+            env=env,
+            asynchronous=True,
+        )
+
+
+def prepare_client(c, env):
+
+    env["DC_USERNAME"] = os.getenv("DC_USERNAME", "bsc_user")
+    env["DC_PASSWORD"] = os.getenv("DC_PASSWORD", "bsc_pass")
+    env["DEFAULT_DATASET"] = os.getenv("DEFAULT_DATASET", "bsc_dataset")
+    env["STUBS_PATH"] = os.getenv("STUBS_PATH", "./stubs")
+    env["MODEL_PATH"] = os.getenv("MODEL_PATH", "./model")
+    env["NAMESPACE"] = os.getenv("NAMESPACE", "dcmodel")
+
+    with c.cd(os.environ["PWD"]):
+        c.run(f"dataclaycmd NewAccount $DC_USERNAME $DC_PASSWORD", env=env)
+        c.run(
+            f"dataclaycmd NewDataContract $DC_USERNAME $DC_PASSWORD $DEFAULT_DATASET $DC_USERNAME",
+            env=env,
+        )
+        c.run(
+            f"dataclaycmd NewModel $DC_USERNAME $DC_PASSWORD $NAMESPACE $MODEL_PATH python", env=env
+        )
+        c.run(f"dataclaycmd GetStubs $DC_USERNAME $DC_PASSWORD $NAMESPACE $STUBS_PATH", env=env)
+
+        c.run("python -m dataclay_mds.tool new_account $DC_USERNAME $DC_PASSWORD", env=env)
+        c.run(
+            "python -m dataclay_mds.tool new_dataset $DC_USERNAME $DC_PASSWORD $DEFAULT_DATASET",
+            env=env,
+        )
+
+
+def deploy_dataclay(args):
+    logger.info("Deploying dataClay")
+
+    # NOTE: The first node should deploy MDS
+    first_node = Connection(args.hosts[0], inline_ssh_env=True)
+    other_nodes = ThreadingGroup(*args.hosts[1:], inline_ssh_env=True)
+
+    # Dictionary to keep all environment variables
+    env = {}
+
+    # Module load
+    env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    env["PATH"] = os.environ["PATH"]
+    env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
+    env["DATACLAY_JAR"] = os.environ["DATACLAY_JAR"]
+    env["DATACLAY_HOME"] = os.environ["DATACLAY_HOME"]
+
+    # Dataclay vars
+    env["DATACLAY_JOB_PATH"] = os.path.expandvars("$HOME/.dataclay/$SLURM_JOB_ID")
+    env["DATACLAY_LOG_PATH"] = env["DATACLAY_JOB_PATH"] + "/logs"
+    env["DATACLAY_ADMIN_USER"] = os.getenv("DATACLAY_ADMIN_USER", "admin")
+    env["DATACLAY_ADMIN_PASSWORD"] = os.getenv("DATACLAY_ADMIN_PASSWORD", "admin")
+
+    # NOTE: If the file system is not shared, each service should "makedirs" the paths
+    os.makedirs(env["DATACLAY_JOB_PATH"], exist_ok=True)
+    os.makedirs(env["DATACLAY_LOG_PATH"], exist_ok=True)
+
+    # Use a argument
+    # tracing = os.getenv("TRACING")
+    env["TRACING"] = os.getenv("TRACING", "false") == "true"
+    if env["TRACING"]:
+        with first_node.cd(os.environ["PWD"]):
+            logger.info(f"Starting Opentelemetry Colector")
+            env["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"http://{first_node.host}:4317"
+            # env["OTEL_EXPORTER_OTLP_INSECURE"] = "true"
+            first_node.run(
+                "otelcontribcol_linux_amd64 --config $DATACLAY_HOME/config/otel-json-exporter.yaml &> $DATACLAY_LOG_PATH/otel.out",
+                env=env,
+                asynchronous=True,
+            )
+
+    # Starting ETCD
+    start_etcd(first_node, env)
+
+    # Starting MetadataService
+    start_metadata_service(first_node, env)
+
+    # Starting LogicModule
+    start_logicmodule(first_node, env)
+
+    # Wait for MetadataService and Logicmodule to be available
+    logger.info(f"Waiting for MetadataService")
+    grpc.channel_ready_future(
+        grpc.insecure_channel(f"{env['METADATA_SERVICE_HOST']}:{env['METADATA_SERVICE_PORT']}")
+    ).result(timeout=15)
+
+    logger.info(f"Waiting for Logicmodule")
+    grpc.channel_ready_future(
+        grpc.insecure_channel(f"{env['LOGICMODULE_HOST']}:{env['LOGICMODULE_PORT_TCP']}")
+    ).result(timeout=15)
+
+    # Starting dsjava and dspython for each extra node
+    for idx, connection in enumerate(other_nodes):
+        start_javaclay(connection, env, idx + 1)
+        start_pyclay(connection, env, idx + 1)
+
+    # Prepare client (new_account, new_dataset)
+    prepare_client(first_node, env)
+
+def stop_dataclay(args):
+    logger.info("Stopping dataClay")
+
+    first_node = Connection(args.hosts[0])
+    other_nodes = ThreadingGroup(*args.hosts[1:])
+
+    other_nodes.run("killall -u $USER python")
+    other_nodes.run("killall -u $USER java")
+
+    # NOTE: killall python doesn't kill "dcdeploy" because it is called as python3
+    # this is very prone to errors. 
+    # TODO: Add to each service a gRPC call for stopping.
+    first_node.run("killall -u $USER python")
+    first_node.run("killall -u $USER java")
+    first_node.run("killall -u $USER etcd")
+
+
+
+# Top-level parser
+parser = argparse.ArgumentParser(description="Deploy tool")
+# TODO: Remove "dest" for new python versions
+subparsers = parser.add_subparsers(dest="function", required=True)
+
+# Parser for the "deploy" command
+parser_deploy = subparsers.add_parser("dataclay")
+parser_deploy.add_argument("-H", "--hosts", nargs="+", required=True)
+parser_deploy.set_defaults(func=deploy_dataclay)
+
+# Parser for the "stop" command
+parser_deploy = subparsers.add_parser("stop")
+parser_deploy.add_argument("-H", "--hosts", nargs="+", required=True)
+parser_deploy.set_defaults(func=stop_dataclay)
+
+args = parser.parse_args()
+args.func(args)

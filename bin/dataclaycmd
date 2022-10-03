@@ -71,11 +71,8 @@ if [ -z "${DATACLAY_JAR}" ]; then
 	exit 1
 fi
 
-# JAVA_OPSBASE="dataclay-java-entry-point"
-JAVA_OPSBASE="java -cp /apps/DATACLAY/DevelMarc/javaclay/dataclay.jar"
-
-# PY_OPSBASE="dataclay-python-entry-point -m dataclay.tool"
-PY_OPSBASE="python -m dataclay.tool"
+JAVA_OPSBASE="java -cp $DATACLAY_JAR"
+PY_OPSBASE="python3 -m dataclay.tool"
 
 # Check if aspects must be applied to Java 
 
@@ -183,7 +180,7 @@ case $OPERATION in
 		if [ $# -lt 4 ]; then
 			errorMsg "Missing arguments. Usage: GetStubs <user_name> <user_pass> <namespace_name> <stubs_path>"
 		fi
-		USER_NAME=$1
+    	USER_NAME=$1
 		shift
 		USER_PASS=$1
 		shift
@@ -207,7 +204,7 @@ case $OPERATION in
 				fi
 				;;
 			'LANG_PYTHON')
-				CONTRACTID=`$ACCESS_NS_MODEL $USER_NAME $USER_PASS $NAMESPACE | tail -1`
+				CONTRACTID=$($ACCESS_NS_MODEL $USER_NAME $USER_PASS $NAMESPACE | tail -1)
 				if [ $? -ge 0 ] && [ ! -z $CONTRACTID ]; then
 					$PY_GETSTUBS $USER_NAME $USER_PASS $CONTRACTID $STUBSPATH $@
 					if [ ! -z $HOST_USER_ID ] && [ ! -z $HOST_GROUP_ID ]; then
@@ -230,7 +227,7 @@ case $OPERATION in
 	'GetExtDataClayID')
 		$GET_EXT_DATACLAYID $PARAMS
 		;;
-	'ImportModelsFromExternalDataClay')
+  	'ImportModelsFromExternalDataClay')
 		$IMPORT_MODELS_FROM_EXT_DATACLAY $PARAMS
 		;;
 	'WaitForDataClayToBeAlive')

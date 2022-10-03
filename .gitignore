@@ -2,3 +2,5 @@
 .project
 *.iml
 .vscode
+/bin/otelcontribcol_linux_amd64
+/bin/etcd
