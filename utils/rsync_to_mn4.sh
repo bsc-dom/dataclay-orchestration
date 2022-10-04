@@ -1,5 +1,11 @@
 #!/bin/bash
-# Script to sync files to MareNostrum4
+
+# Script to sync dataclay and orchestration files to MareNostrum4
+# Change the necessary fields!
+
+##############
+# TO CHANGE! #
+##############
 
 # Name of the dataclay version (change it!)
 DATACLAY_VERSION=DevelMarc
@@ -13,7 +19,11 @@ MDS_PATH=~/dev/bsc-dom/metadata-service
 DATACLAY_COMMON_PATH=~/dev/bsc-dom/dataclay-common
 JAVACLAY_PATH=~/dev/bsc-dom/javaclay
 
-# (do not change!)
+##############
+##############
+##############
+
+# Internal MareNostrum paths (do not change!)
 MN1_HOST=$BSC_USER@mn1.bsc.es
 MN0_HOST=$BSC_USER@mn0.bsc.es
 MN_DATACLAY_PATH=/apps/DATACLAY/$DATACLAY_VERSION/
@@ -42,4 +52,6 @@ scp modulefile.lua $MN1_HOST:$MN_LUA_PATH
 
 # dependencies
 rsync -av dependencies $MN1_HOST:$MN_DATACLAY_PATH
+# Comment the next line if not wanting to create the virtual environments.
+# It is necessary a VPN connection in order to use MN0 login (the only login with internet)
 ssh $MN0_HOST "cd $MN_DATACLAY_PATH/dependencies && ./install_dependencies.sh"
