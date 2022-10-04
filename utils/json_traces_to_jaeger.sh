@@ -25,3 +25,5 @@ scp $BSC_USER@mn1.bsc.es:~/.dataclay/otel-traces.json .
 
 # Start OpenTelemetry Colector to read json and sent it to Jaeger
 timeout 30 bin/otelcontribcol_linux_amd64 --config config/otel-json-to-jaeger.yaml &
+
+# Open Jaeger in http://localhost:16686/search

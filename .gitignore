@@ -5,3 +5,4 @@
 /bin/otelcontribcol_linux_amd64
 /bin/etcd*
 /bin/otelcol-contrib
+otel-traces.json
