@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Downloads otelcol-contrib binary and save it to ./bin
 # Modified script from https://github.com/etcd-io/etcd/releases/
 
 OTELCOL_VER=0.61.0

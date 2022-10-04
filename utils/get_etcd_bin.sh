@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Downloads etcd binaries and save them to ./bin
 # Modified script from https://github.com/etcd-io/etcd/releases/
 
 ETCD_VER=v3.5.5
