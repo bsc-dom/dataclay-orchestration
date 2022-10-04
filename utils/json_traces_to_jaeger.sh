@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# This script copies the latest json traces from MareNostrum, a
 # Script to visualize the mn4 json traces in jaeger
 
 # Stop jaeger container
