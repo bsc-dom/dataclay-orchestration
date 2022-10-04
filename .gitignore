@@ -3,4 +3,5 @@
 *.iml
 .vscode
 /bin/otelcontribcol_linux_amd64
-/bin/etcd
+/bin/etcd*
+/bin/otelcol-contrib
