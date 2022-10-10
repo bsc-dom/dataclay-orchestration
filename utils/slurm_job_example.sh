@@ -29,6 +29,8 @@ export MODEL_PATH=./model
 export NAMESPACE=dcmodel
 
 export TRACING=true
+export OTEL_TRACES_SAMPLER=traceidratio
+export OTEL_TRACES_SAMPLER_ARG=0.1
 export OTEL_SERVICE_NAME=client
 
 #######################

@@ -64,8 +64,8 @@ def start_logicmodule(c, env):
     service_folder = env["DATACLAY_JOB_PATH"] + "/logicmodule"
     os.makedirs(service_folder)
 
-    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"
-    env["STORAGE_PATH"] = service_folder + "/storage"
+    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata" # do we need?
+    env["STORAGE_PATH"] = service_folder + "/storage" # do we need?
 
     with c.cd(service_folder):
         c.run(
@@ -185,6 +185,8 @@ def deploy_dataclay(args):
         with first_node.cd(os.environ["PWD"]):
             logger.info(f"Starting Opentelemetry Colector")
             env["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"http://{first_node.host}:4317"
+            env["OTEL_TRACES_SAMPLER"] = os.getenv("OTEL_TRACES_SAMPLER", "traceidratio")
+            env["OTEL_TRACES_SAMPLER_ARG"] = os.getenv("OTEL_TRACES_SAMPLER_ARG", "0.1")
             # env["OTEL_EXPORTER_OTLP_INSECURE"] = "true"
             first_node.run(
                 "otelcontribcol_linux_amd64 --config $DATACLAY_HOME/config/otel-json-exporter.yaml &> $DATACLAY_LOG_PATH/otel.out",
