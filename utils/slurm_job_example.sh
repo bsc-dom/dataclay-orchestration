@@ -45,11 +45,12 @@ dcdeploy dataclay -H ${hostnames[@]}
 ################
 
 echo "Starting application"
+tracing_prefix=""
 if [ $TRACING == "true" ]; then
-    opentelemetry-instrument python3 -u app/matrix-demo.py 1 0
-else
-    python3 -u app/matrix-demo.py 1 0
+    tracing_prefix="opentelemetry-instrument"
 fi
+
+$tracing_prefix python3 -u app/matrix-demo.py 1 0
 
 #####################
 # Stopping dataclay # 
