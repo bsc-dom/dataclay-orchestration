@@ -29,6 +29,7 @@ export MODEL_PATH=./model
 export NAMESPACE=dcmodel
 
 export TRACING=true
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://${hostnames[0]}:4317 # DO NOT EDIT!
 export OTEL_TRACES_SAMPLER=traceidratio
 export OTEL_TRACES_SAMPLER_ARG=0.1
 export OTEL_SERVICE_NAME=client
@@ -52,9 +53,14 @@ fi
 
 $tracing_prefix python3 -u app/matrix-demo.py 1 0
 
+# For testing
+# dcdeploy run "python3 -u app/matrix-demo.py 1 0" -H ${hostnames[@]}
+
+
 #####################
 # Stopping dataclay # 
 #####################
 
 echo "Stopping dataclay"
 dcdeploy stop -H ${hostnames[@]}
+echo "Dataclay stopped"

@@ -33,11 +33,11 @@ def start_metadata_service(c, env):
     logger.info("Starting MetadataService")
 
     env["METADATA_SERVICE_HOST"] = c.host
-    env["METADATA_SERVICE_PORT"] = os.getenv("LOGICMODULE_PORT_TCP", 16587)
+    env["METADATA_SERVICE_PORT"] = os.getenv("METADATA_SERVICE_PORT", 16587)
 
-    # Check that job environ is correct
-    if env["METADATA_SERVICE_HOST"] != os.environ["METADATA_SERVICE_HOST"]:
-        raise
+    # NOTE: MetadataService should be deployed on the first node. 
+    # check that job environ is correct.
+    assert(env["METADATA_SERVICE_HOST"] == os.environ["METADATA_SERVICE_HOST"])
 
     service_folder = env["DATACLAY_JOB_PATH"] + "/metadata_service"
     os.makedirs(service_folder)
@@ -64,8 +64,8 @@ def start_logicmodule(c, env):
     service_folder = env["DATACLAY_JOB_PATH"] + "/logicmodule"
     os.makedirs(service_folder)
 
-    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata" # do we need?
-    env["STORAGE_PATH"] = service_folder + "/storage" # do we need?
+    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"  # do we need?
+    env["STORAGE_PATH"] = service_folder + "/storage"  # do we need?
 
     with c.cd(service_folder):
         c.run(
@@ -178,13 +178,16 @@ def deploy_dataclay(args):
     os.makedirs(env["DATACLAY_JOB_PATH"], exist_ok=True)
     os.makedirs(env["DATACLAY_LOG_PATH"], exist_ok=True)
 
-    # Use a argument
-    # tracing = os.getenv("TRACING")
+    # Tracing using Opentelemetry
     env["TRACING"] = os.getenv("TRACING", "false") == "true"
     if env["TRACING"]:
         with first_node.cd(os.environ["PWD"]):
             logger.info(f"Starting Opentelemetry Colector")
+
+            # NOTE: Opentelemetry Colector should always be deployed on the first node (like MDS)
             env["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"http://{first_node.host}:4317"
+            assert(env["OTEL_EXPORTER_OTLP_ENDPOINT"] == os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"])
+
             env["OTEL_TRACES_SAMPLER"] = os.getenv("OTEL_TRACES_SAMPLER", "traceidratio")
             env["OTEL_TRACES_SAMPLER_ARG"] = os.getenv("OTEL_TRACES_SAMPLER_ARG", "0.1")
             # env["OTEL_EXPORTER_OTLP_INSECURE"] = "true"
@@ -222,6 +225,7 @@ def deploy_dataclay(args):
     # Prepare client (new_account, new_dataset)
     prepare_client(first_node, env)
 
+
 def stop_dataclay(args):
     logger.info("Stopping dataClay")
 
@@ -232,12 +236,69 @@ def stop_dataclay(args):
     other_nodes.run("killall -u $USER java")
 
     # NOTE: killall python doesn't kill "dcdeploy" because it is called as python3
-    # this is very prone to errors. 
+    # this is very prone to errors.
     # TODO: Add to each service a gRPC call for stopping.
     first_node.run("killall -u $USER python")
     first_node.run("killall -u $USER java")
     first_node.run("killall -u $USER etcd")
 
+
+def run_app(args):
+    logger.info("Running application")
+    nodes = ThreadingGroup(*args.hosts, inline_ssh_env=True)
+
+    # Dictionary to keep all environment variables
+    env = {}
+
+    # Module load
+    env["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    env["PATH"] = os.environ["PATH"]
+    env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
+    env["DATACLAY_JAR"] = os.environ["DATACLAY_JAR"]
+    env["DATACLAY_HOME"] = os.environ["DATACLAY_HOME"]
+
+    # Dataclay vars
+    env["DATACLAY_JOB_PATH"] = os.path.expandvars("$HOME/.dataclay/$SLURM_JOB_ID")
+    env["DATACLAY_LOG_PATH"] = env["DATACLAY_JOB_PATH"] + "/logs"
+    env["DATACLAY_ADMIN_USER"] = os.getenv("DATACLAY_ADMIN_USER", "admin")
+    env["DATACLAY_ADMIN_PASSWORD"] = os.getenv("DATACLAY_ADMIN_PASSWORD", "admin")
+
+    # Metadata config
+    env["METADATA_SERVICE_HOST"] = os.environ["METADATA_SERVICE_HOST"]
+    env["METADATA_SERVICE_PORT"] = os.getenv("METADATA_SERVICE_PORT", 16587)
+
+    # Client config
+    env["DC_USERNAME"] = os.getenv("DC_USERNAME", "bsc_user")
+    env["DC_PASSWORD"] = os.getenv("DC_PASSWORD", "bsc_pass")
+    env["DEFAULT_DATASET"] = os.getenv("DEFAULT_DATASET", "bsc_dataset")
+    env["STUBS_PATH"] = os.getenv("STUBS_PATH", "./stubs")
+
+    env["TRACING"] = os.getenv("TRACING", "false") == "true"
+    tracing_prefix = ""
+    if env["TRACING"]:
+        tracing_prefix = "opentelemetry-instrument"
+        env["OTEL_EXPORTER_OTLP_ENDPOINT"] = os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]
+        env["OTEL_TRACES_SAMPLER"] = os.getenv("OTEL_TRACES_SAMPLER", "traceidratio")
+        env["OTEL_TRACES_SAMPLER_ARG"] = os.getenv("OTEL_TRACES_SAMPLER_ARG", "0.1")
+        env["OTEL_SERVICE_NAME"] = "client"
+
+    # TODO: Create a list of promises (ourput of async run), and join them at the end of all executions (like in matrix-demo.py) 
+    promises = []
+
+    # Starting client execution (for testing purposes)
+    for idx, connection in enumerate(nodes):
+        logger.info(f"Running app from Client {idx+1}")
+        service_name = f"client{idx+1}"
+
+        with connection.cd(os.environ["PWD"]):
+            promises.append(connection.run(
+                f"{tracing_prefix} {args.command} &> $DATACLAY_LOG_PATH/{service_name}.out",
+                env=env,
+                asynchronous=True,
+            ))
+
+    for p in promises:
+        p.join()
 
 
 # Top-level parser
@@ -247,13 +308,33 @@ subparsers = parser.add_subparsers(dest="function", required=True)
 
 # Parser for the "deploy" command
 parser_deploy = subparsers.add_parser("dataclay")
-parser_deploy.add_argument("-H", "--hosts", nargs="+", required=True)
+parser_deploy.add_argument(
+    "-H",
+    "--hosts",
+    nargs="+",
+    required=True,
+    help="hostnames to deploy dataclay. First hostname must be the client node.",
+)
 parser_deploy.set_defaults(func=deploy_dataclay)
 
 # Parser for the "stop" command
 parser_deploy = subparsers.add_parser("stop")
-parser_deploy.add_argument("-H", "--hosts", nargs="+", required=True)
+parser_deploy.add_argument(
+    "-H",
+    "--hosts",
+    nargs="+",
+    required=True,
+    help="hostnames where dataclay is deployed. First hostname must be the client node.",
+)
 parser_deploy.set_defaults(func=stop_dataclay)
+
+# Parser for the "run" command
+parser_deploy = subparsers.add_parser("run")
+parser_deploy.add_argument("command", help="command to run on each host")
+parser_deploy.add_argument(
+    "-H", "--hosts", nargs="+", required=True, help="hostnames to run the command"
+)
+parser_deploy.set_defaults(func=run_app)
 
 args = parser.parse_args()
 args.func(args)
