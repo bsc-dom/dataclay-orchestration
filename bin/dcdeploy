@@ -3,6 +3,7 @@
 import argparse
 import logging
 import os
+import time
 
 import grpc
 from fabric import Connection, ThreadingGroup
@@ -35,9 +36,9 @@ def start_metadata_service(c, env):
     env["METADATA_SERVICE_HOST"] = c.host
     env["METADATA_SERVICE_PORT"] = os.getenv("METADATA_SERVICE_PORT", 16587)
 
-    # NOTE: MetadataService should be deployed on the first node. 
+    # NOTE: MetadataService should be deployed on the first node.
     # check that job environ is correct.
-    assert(env["METADATA_SERVICE_HOST"] == os.environ["METADATA_SERVICE_HOST"])
+    assert env["METADATA_SERVICE_HOST"] == os.environ["METADATA_SERVICE_HOST"]
 
     service_folder = env["DATACLAY_JOB_PATH"] + "/metadata_service"
     os.makedirs(service_folder)
@@ -186,7 +187,7 @@ def deploy_dataclay(args):
 
             # NOTE: Opentelemetry Colector should always be deployed on the first node (like MDS)
             env["OTEL_EXPORTER_OTLP_ENDPOINT"] = f"http://{first_node.host}:4317"
-            assert(env["OTEL_EXPORTER_OTLP_ENDPOINT"] == os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"])
+            assert env["OTEL_EXPORTER_OTLP_ENDPOINT"] == os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"]
 
             env["OTEL_TRACES_SAMPLER"] = os.getenv("OTEL_TRACES_SAMPLER", "traceidratio")
             env["OTEL_TRACES_SAMPLER_ARG"] = os.getenv("OTEL_TRACES_SAMPLER_ARG", "0.1")
@@ -232,14 +233,21 @@ def stop_dataclay(args):
     first_node = Connection(args.hosts[0])
     other_nodes = ThreadingGroup(*args.hosts[1:])
 
+    logger.info("Stopping python backends")
     other_nodes.run("killall -u $USER python")
+    logger.info("Stopping java backends")
     other_nodes.run("killall -u $USER java")
+
+    time.sleep(10)
 
     # NOTE: killall python doesn't kill "dcdeploy" because it is called as python3
     # this is very prone to errors.
     # TODO: Add to each service a gRPC call for stopping.
+    logger.info("Stopping MDS")
     first_node.run("killall -u $USER python")
+    logger.info("Stopping LM")
     first_node.run("killall -u $USER java")
+    logger.info("Stopping ETCD")
     first_node.run("killall -u $USER etcd")
 
 
@@ -282,21 +290,26 @@ def run_app(args):
         env["OTEL_TRACES_SAMPLER_ARG"] = os.getenv("OTEL_TRACES_SAMPLER_ARG", "0.1")
         env["OTEL_SERVICE_NAME"] = "client"
 
-    # TODO: Create a list of promises (ourput of async run), and join them at the end of all executions (like in matrix-demo.py) 
+    # TODO: Create a list of promises (ourput of async run), and join them at the end of all executions (like in matrix-demo.py)
     promises = []
+
+    # NOTE: sshd_config usually has a MaxSessions=10 which avoids more than 10 processes.
+    args.processes = min(max(args.processes, 1), 10)
 
     # Starting client execution (for testing purposes)
     for idx, connection in enumerate(nodes):
-        for num_process in range(max(args.processes,1)):
+        for num_process in range(args.processes):
             logger.info(f"Running app in client {idx+1} - process {num_process+1}")
             service_name = f"client{idx+1}-{num_process+1}"
 
             with connection.cd(os.environ["PWD"]):
-                promises.append(connection.run(
-                    f"{tracing_prefix} {args.command} &> $DATACLAY_LOG_PATH/{service_name}.out",
-                    env=env,
-                    asynchronous=True,
-                ))
+                promises.append(
+                    connection.run(
+                        f"{tracing_prefix} {args.command} &> $DATACLAY_LOG_PATH/{service_name}.out",
+                        env=env,
+                        asynchronous=True,
+                    )
+                )
 
     for p in promises:
         p.join()
@@ -332,7 +345,13 @@ parser_deploy.set_defaults(func=stop_dataclay)
 # Parser for the "run" command
 parser_deploy = subparsers.add_parser("run")
 parser_deploy.add_argument("command", help="command to run on each host")
-parser_deploy.add_argument('-p', '--processes', type=int, help='number of processes to execute in each host')
+parser_deploy.add_argument(
+    "-p",
+    "--processes",
+    type=int,
+    default=1,
+    help="number of processes to execute in each host (max 10 due to sshd config)",
+)
 parser_deploy.add_argument(
     "-H", "--hosts", nargs="+", required=True, help="hostnames to run the command"
 )

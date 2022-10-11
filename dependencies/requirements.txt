@@ -8,6 +8,7 @@ protobuf~=3.19.0
 psutil~=5.9.1
 PyYAML~=6.0
 etcd3~=0.12.0
+tenacity~=6.1.0
 fabric
 bcrypt
 passlib
