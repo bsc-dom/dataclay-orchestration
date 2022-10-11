@@ -54,7 +54,7 @@ fi
 $tracing_prefix python3 -u app/matrix-demo.py 1 0
 
 # For testing
-# dcdeploy run "python3 -u app/matrix-demo.py 1 0" -H ${hostnames[@]}
+# dcdeploy run "python3 -u app/matrix-demo.py 1 0" -p 3 -H ${hostnames[@]}
 
 
 #####################

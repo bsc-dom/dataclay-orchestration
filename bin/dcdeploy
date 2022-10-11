@@ -287,15 +287,16 @@ def run_app(args):
 
     # Starting client execution (for testing purposes)
     for idx, connection in enumerate(nodes):
-        logger.info(f"Running app from Client {idx+1}")
-        service_name = f"client{idx+1}"
+        for num_process in range(max(args.processes,1)):
+            logger.info(f"Running app in client {idx+1} - process {num_process+1}")
+            service_name = f"client{idx+1}-{num_process+1}"
 
-        with connection.cd(os.environ["PWD"]):
-            promises.append(connection.run(
-                f"{tracing_prefix} {args.command} &> $DATACLAY_LOG_PATH/{service_name}.out",
-                env=env,
-                asynchronous=True,
-            ))
+            with connection.cd(os.environ["PWD"]):
+                promises.append(connection.run(
+                    f"{tracing_prefix} {args.command} &> $DATACLAY_LOG_PATH/{service_name}.out",
+                    env=env,
+                    asynchronous=True,
+                ))
 
     for p in promises:
         p.join()
@@ -331,6 +332,7 @@ parser_deploy.set_defaults(func=stop_dataclay)
 # Parser for the "run" command
 parser_deploy = subparsers.add_parser("run")
 parser_deploy.add_argument("command", help="command to run on each host")
+parser_deploy.add_argument('-p', '--processes', type=int, help='number of processes to execute in each host')
 parser_deploy.add_argument(
     "-H", "--hosts", nargs="+", required=True, help="hostnames to run the command"
 )
