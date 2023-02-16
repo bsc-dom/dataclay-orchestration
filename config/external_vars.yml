@@ -1,12 +1,13 @@
 module_paths:
   PATH: "{{ lookup('env', 'PATH') }}"
-  PYTHONPATH: "{{ lookup('env', 'PYTHONPATH') }}"
+  PYTHONPATH: "{{ lookup('env', 'PYTHONPATH') }}:{{ lookup('env', 'PWD') }}"
   PYTHONHOME: "{{ lookup('env', 'PYTHONHOME') }}"
   LD_LIBRARY_PATH: "{{ lookup('env', 'LD_LIBRARY_PATH') }}"
 
 dataclay_envs:
   DATACLAY_PASSWORD: "{{ lookup('env', 'DATACLAY_PASSWORD') | default('s3cret', true) }}"
-  DATACLAY_USER: "{{ lookup('env', 'DATACLAY_USER') | default('testuser', true) }}"
+  DATACLAY_USERNAME: "{{ lookup('env', 'DATACLAY_USERNAME') | default('testuser', true) }}"
+  DATACLAY_DATASET: "{{ lookup('env', 'DATACLAY_DATASET') | default('testuser', true) }}"
 
   DATACLAY_METADATA_PORT: "{{ lookup('env', 'DATACLAY_METADATA_PORT') | default(16587, true) }}"
   DATACLAY_BACKEND_PORT: "{{ lookup('env', 'DATACLAY_BACKEND_PORT') | default(6868, true) }}"

@@ -114,7 +114,7 @@ def deploy_dataclay(args):
     # Dataclay vars
     env["DATACLAY_JOB_PATH"] = os.path.expandvars("$HOME/.dataclay/$SLURM_JOB_ID")
     env["DATACLAY_LOG_PATH"] = env["DATACLAY_JOB_PATH"] + "/logs"
-    env["DATACLAY_USER"] = os.getenv("DATACLAY_USER", "testuser")
+    env["DATACLAY_USERNAME"] = os.getenv("DATACLAY_USERNAME", "testuser")
     env["DATACLAY_PASSWORD"] = os.getenv("DATACLAY_PASSWORD", "s3cret")
 
     # NOTE: If the file system is not shared, each service should "makedirs" the paths
@@ -193,7 +193,7 @@ def run_app(args):
     # Dataclay vars
     env["DATACLAY_JOB_PATH"] = os.path.expandvars("$HOME/.dataclay/$SLURM_JOB_ID")
     env["DATACLAY_LOG_PATH"] = env["DATACLAY_JOB_PATH"] + "/logs"
-    env["DATACLAY_USER"] = os.getenv("DATACLAY_USER", "testuser")
+    env["DATACLAY_USERNAME"] = os.getenv("DATACLAY_USERNAME", "testuser")
     env["DATACLAY_PASSWORD"] = os.getenv("DATACLAY_PASSWORD", "s3cret")
 
     # Metadata config
