@@ -20,7 +20,7 @@ network_suffix="-ib0"
 hostnames=($(scontrol show hostname $SLURM_JOB_NODELIST | sed "s/$/$network_suffix/"))
 
 # Set environment variables
-export METADATA_SERVICE_HOST=${hostnames[0]} # DO NOT EDIT!
+export DATACLAY_METADATA_HOST=${hostnames[0]} # DO NOT EDIT!
 export DC_USERNAME=user
 export DC_PASSWORD=s3cret
 export DEFAULT_DATASET=myDataset
@@ -39,7 +39,7 @@ export OTEL_SERVICE_NAME=client
 #######################
 
 echo "Deploying dataClay"
-dcdeploy dataclay -H ${hostnames[@]}
+dcdeploy-fabric dataclay -H ${hostnames[@]}
 
 ################
 # Dataclay app #
@@ -54,7 +54,7 @@ fi
 $tracing_prefix python3 -u app/matrix-demo.py 1 0
 
 # For testing
-# dcdeploy run "python3 -u app/matrix-demo.py 1 0" -p 3 -H ${hostnames[@]}
+# dcdeploy-fabric run "python3 -u app/matrix-demo.py 1 0" -p 3 -H ${hostnames[@]}
 
 
 #####################
@@ -62,5 +62,5 @@ $tracing_prefix python3 -u app/matrix-demo.py 1 0
 #####################
 
 echo "Stopping dataclay"
-dcdeploy stop -H ${hostnames[@]}
+dcdeploy-fabric stop -H ${hostnames[@]}
 echo "Dataclay stopped"

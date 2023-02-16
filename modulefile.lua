@@ -8,10 +8,9 @@ whatis("Description: dataClay active objects across the network")
 ------------
 -- lua setup
 ------------
-PROG_NAME = "DATACLAY"
-PROG_VERSION = "DevelMarc"
-PROG_HOME = "/apps/" .. PROG_NAME .. "/" .. PROG_VERSION
-DATACLAY_HOME = PROG_HOME
+local name = "DATACLAY"
+local version = "DevelMarc"
+local home = pathJoin("/apps", name, version)
 
 ---------------
 -- Dependencies
@@ -32,7 +31,7 @@ prereq(atleast("python","3.10.2"))
 execute {cmd="export PYTHON_VERSION=$(python -V 2>&1 | awk '{print $2}')", modeA={"load"}}
 PYTHON_VERSION=os.getenv("PYTHON_VERSION") or DEFAULT_PYTHON_VERSION
 
-VENV_PATH = pathJoin(DATACLAY_HOME, "venv" .. PYTHON_VERSION)
+VENV_PATH = pathJoin(home, "venv" .. PYTHON_VERSION)
 setenv("VENV_PATH", VENV_PATH)
 
 --------------------
@@ -46,14 +45,14 @@ execute {cmd="export PYTHONPATH=$(find $VENV_PATH -name site-packages):$PYTHONPA
 --------------
 -- Update PATH
 --------------
-append_path("PATH", DATACLAY_HOME .. "/bin")
+append_path("PATH", home .. "/bin")
 append_path("PATH", VENV_PATH .. "/bin") -- for opentelemetry-instrument
 
 ------------------
 -- COMPSs bindings
 ------------------
--- append_path("PATH", DATACLAY_HOME .. "/scripts")
-setenv("COMPSS_STORAGE_HOME", DATACLAY_HOME)
-
+-- append_path("PATH", home .. "/scripts")
+setenv("COMPSS_STORAGE_HOME", home)
+setenv("DATACLAY_HOME", home)
 
 

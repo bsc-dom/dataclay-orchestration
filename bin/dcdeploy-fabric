@@ -16,15 +16,32 @@ logger.setLevel(logging.DEBUG)
 def start_etcd(c, env):
     logger.info("Starting ETCD")
 
-    env["ETCD_HOST"] = c.host
-    env["ETCD_PORT"] = os.getenv("ETCD_PORT", 2379)
+    env["KV_HOST"] = c.host
+    env["KV_PORT"] = os.getenv("KV_PORT", 2379)
 
     service_folder = env["DATACLAY_JOB_PATH"] + "/etcd"
     os.makedirs(service_folder)
 
     with c.cd(service_folder):
         c.run(
-            f"etcd --data-dir metadata.etcd --advertise-client-urls 'http://0.0.0.0:{env['ETCD_PORT']}' --listen-client-urls 'http://0.0.0.0:{env['ETCD_PORT']}' &> $DATACLAY_LOG_PATH/etcd.out",
+            f"etcd --data-dir metadata.etcd --advertise-client-urls 'http://0.0.0.0:{env['KV_PORT']}' --listen-client-urls 'http://0.0.0.0:{env['KV_PORT']}' &> $DATACLAY_LOG_PATH/etcd.out",
+            env=env,
+            asynchronous=True,
+        )
+
+
+def start_redis(c, env):
+    logger.info("Starting Redis")
+
+    env["KV_HOST"] = c.host
+    env["KV_PORT"] = os.getenv("KV_PORT", 6379)
+
+    service_folder = env["DATACLAY_JOB_PATH"] + "/redis"
+    os.makedirs(service_folder)
+
+    with c.cd(service_folder):
+        c.run(
+            f"",
             env=env,
             asynchronous=True,
         )
@@ -33,12 +50,12 @@ def start_etcd(c, env):
 def start_metadata_service(c, env):
     logger.info("Starting MetadataService")
 
-    env["METADATA_SERVICE_HOST"] = c.host
-    env["METADATA_SERVICE_PORT"] = os.getenv("METADATA_SERVICE_PORT", 16587)
+    env["DATACLAY_METADATA_HOST"] = c.host
+    env["DATACLAY_METADATA_PORT"] = os.getenv("DATACLAY_METADATA_PORT", 16587)
 
     # NOTE: MetadataService should be deployed on the first node.
     # check that job environ is correct.
-    assert env["METADATA_SERVICE_HOST"] == os.environ["METADATA_SERVICE_HOST"]
+    assert env["DATACLAY_METADATA_HOST"] == os.environ["DATACLAY_METADATA_HOST"]
 
     service_folder = env["DATACLAY_JOB_PATH"] + "/metadata_service"
     os.makedirs(service_folder)
@@ -50,66 +67,19 @@ def start_metadata_service(c, env):
 
     with c.cd(service_folder):
         c.run(
-            f"{prefix} python -m dataclay_mds.server &> $DATACLAY_LOG_PATH/mds.out",
+            f"{prefix} python -m dataclay.metadata &> $DATACLAY_LOG_PATH/mds.out",
             env=env,
             asynchronous=True,
         )
 
 
-def start_logicmodule(c, env):
-    logger.info("Starting Logicmodule")
-
-    env["LOGICMODULE_HOST"] = c.host
-    env["LOGICMODULE_PORT_TCP"] = os.getenv("LOGICMODULE_PORT_TCP", 11034)
-
-    service_folder = env["DATACLAY_JOB_PATH"] + "/logicmodule"
-    os.makedirs(service_folder)
-
-    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"  # do we need?
-    env["STORAGE_PATH"] = service_folder + "/storage"  # do we need?
-
-    with c.cd(service_folder):
-        c.run(
-            "java -cp $DATACLAY_JAR es.bsc.dataclay.logic.server.LogicModuleSrv &> $DATACLAY_LOG_PATH/lm.out",
-            env=env,
-            asynchronous=True,
-        )
-
-
-def start_javaclay(c, env, num):
-    logger.info(f"Starting Javaclay {num}")
-
-    env["DATASERVICE_NAME"] = f"DS{num}"
-    env["DATASERVICE_JAVA_PORT_TCP"] = os.getenv("DATASERVICE_JAVA_PORT_TCP", 2127)
-    env["DATASERVICE_HOST"] = c.host  # Maybe is breaking things..
-
-    service_name = f"dsjava{num}"
-    service_folder = f"{env['DATACLAY_JOB_PATH']}/{service_name}"
-    os.makedirs(service_folder)
-
-    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"  # do we need?
-    env["STORAGE_PATH"] = service_folder + "/storage"  # do we need?
-
-    with c.cd(service_folder):
-        c.run(
-            f"java -Dlog4j.configurationFile=/apps/DATACLAY/DevelMarc/dataclay-common/cfglog/log4j2.xml -cp $DATACLAY_JAR es.bsc.dataclay.dataservice.server.DataServiceSrv &> $DATACLAY_LOG_PATH/{service_name}.out",
-            env=env,
-            asynchronous=True,
-        )
-
-
-def start_pyclay(c, env, num):
+def start_backend(c, env, num):
     logger.info(f"Starting Pyclay {num}")
 
-    env["DATASERVICE_NAME"] = f"DS{num}"
-    env["DEPLOY_PATH_SRC"] = "."  # Dangerous relative path
-    env["DEPLOY_PATH"] = "."  # Dangerous relative path
-
-    service_name = f"dspython{num}"
+    service_name = f"backend{num}"
     service_folder = f"{env['DATACLAY_JOB_PATH']}/{service_name}"
     os.makedirs(service_folder)
 
-    env["STORAGE_METADATA_PATH"] = service_folder + "/metadata"  # do we need?
     env["STORAGE_PATH"] = service_folder + "/storage"  # do we need?
 
     prefix = ""
@@ -119,36 +89,9 @@ def start_pyclay(c, env, num):
 
     with c.cd(service_folder):
         c.run(
-            f"{prefix} python -u -m dataclay.executionenv.server &> $DATACLAY_LOG_PATH/{service_name}.out",
+            f"{prefix} python -u -m dataclay.backend &> $DATACLAY_LOG_PATH/{service_name}.out",
             env=env,
             asynchronous=True,
-        )
-
-
-def prepare_client(c, env):
-
-    env["DC_USERNAME"] = os.getenv("DC_USERNAME", "bsc_user")
-    env["DC_PASSWORD"] = os.getenv("DC_PASSWORD", "bsc_pass")
-    env["DEFAULT_DATASET"] = os.getenv("DEFAULT_DATASET", "bsc_dataset")
-    env["STUBS_PATH"] = os.getenv("STUBS_PATH", "./stubs")
-    env["MODEL_PATH"] = os.getenv("MODEL_PATH", "./model")
-    env["NAMESPACE"] = os.getenv("NAMESPACE", "dcmodel")
-
-    with c.cd(os.environ["PWD"]):
-        c.run(f"dataclaycmd NewAccount $DC_USERNAME $DC_PASSWORD", env=env)
-        c.run(
-            f"dataclaycmd NewDataContract $DC_USERNAME $DC_PASSWORD $DEFAULT_DATASET $DC_USERNAME",
-            env=env,
-        )
-        c.run(
-            f"dataclaycmd NewModel $DC_USERNAME $DC_PASSWORD $NAMESPACE $MODEL_PATH python", env=env
-        )
-        c.run(f"dataclaycmd GetStubs $DC_USERNAME $DC_PASSWORD $NAMESPACE $STUBS_PATH", env=env)
-
-        c.run("python -m dataclay_mds.tool new_account $DC_USERNAME $DC_PASSWORD", env=env)
-        c.run(
-            "python -m dataclay_mds.tool new_dataset $DC_USERNAME $DC_PASSWORD $DEFAULT_DATASET",
-            env=env,
         )
 
 
@@ -166,14 +109,13 @@ def deploy_dataclay(args):
     env["PYTHONPATH"] = os.environ["PYTHONPATH"]
     env["PATH"] = os.environ["PATH"]
     env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
-    env["DATACLAY_JAR"] = os.environ["DATACLAY_JAR"]
     env["DATACLAY_HOME"] = os.environ["DATACLAY_HOME"]
 
     # Dataclay vars
     env["DATACLAY_JOB_PATH"] = os.path.expandvars("$HOME/.dataclay/$SLURM_JOB_ID")
     env["DATACLAY_LOG_PATH"] = env["DATACLAY_JOB_PATH"] + "/logs"
-    env["DATACLAY_ADMIN_USER"] = os.getenv("DATACLAY_ADMIN_USER", "admin")
-    env["DATACLAY_ADMIN_PASSWORD"] = os.getenv("DATACLAY_ADMIN_PASSWORD", "admin")
+    env["DATACLAY_USER"] = os.getenv("DATACLAY_USER", "testuser")
+    env["DATACLAY_PASSWORD"] = os.getenv("DATACLAY_PASSWORD", "s3cret")
 
     # NOTE: If the file system is not shared, each service should "makedirs" the paths
     os.makedirs(env["DATACLAY_JOB_PATH"], exist_ok=True)
@@ -198,33 +140,21 @@ def deploy_dataclay(args):
                 asynchronous=True,
             )
 
-    # Starting ETCD
+    # Starting KV
     start_etcd(first_node, env)
 
     # Starting MetadataService
     start_metadata_service(first_node, env)
 
-    # Starting LogicModule
-    start_logicmodule(first_node, env)
-
-    # Wait for MetadataService and Logicmodule to be available
+    # Wait for MetadataService to be available (#TODO: This wait should be done inside)
     logger.info(f"Waiting for MetadataService")
     grpc.channel_ready_future(
-        grpc.insecure_channel(f"{env['METADATA_SERVICE_HOST']}:{env['METADATA_SERVICE_PORT']}")
+        grpc.insecure_channel(f"{env['DATACLAY_METADATA_HOST']}:{env['DATACLAY_METADATA_PORT']}")
     ).result(timeout=15)
 
-    logger.info(f"Waiting for Logicmodule")
-    grpc.channel_ready_future(
-        grpc.insecure_channel(f"{env['LOGICMODULE_HOST']}:{env['LOGICMODULE_PORT_TCP']}")
-    ).result(timeout=15)
-
-    # Starting dsjava and dspython for each extra node
+    # Starting pyclay for each extra node
     for idx, connection in enumerate(other_nodes):
-        start_javaclay(connection, env, idx + 1)
-        start_pyclay(connection, env, idx + 1)
-
-    # Prepare client (new_account, new_dataset)
-    prepare_client(first_node, env)
+        start_backend(connection, env, idx + 1)
 
 
 def stop_dataclay(args):
@@ -235,8 +165,6 @@ def stop_dataclay(args):
 
     logger.info("Stopping python backends")
     other_nodes.run("killall -u $USER python")
-    logger.info("Stopping java backends")
-    other_nodes.run("killall -u $USER java")
 
     time.sleep(10)
 
@@ -245,10 +173,8 @@ def stop_dataclay(args):
     # TODO: Add to each service a gRPC call for stopping.
     logger.info("Stopping MDS")
     first_node.run("killall -u $USER python")
-    logger.info("Stopping LM")
-    first_node.run("killall -u $USER java")
-    logger.info("Stopping ETCD")
-    first_node.run("killall -u $USER etcd")
+    logger.info("Stopping Redis")
+    first_node.run("killall -u $USER redis")
 
 
 def run_app(args):
@@ -262,24 +188,22 @@ def run_app(args):
     env["PYTHONPATH"] = os.environ["PYTHONPATH"]
     env["PATH"] = os.environ["PATH"]
     env["LD_LIBRARY_PATH"] = os.environ["LD_LIBRARY_PATH"]
-    env["DATACLAY_JAR"] = os.environ["DATACLAY_JAR"]
     env["DATACLAY_HOME"] = os.environ["DATACLAY_HOME"]
 
     # Dataclay vars
     env["DATACLAY_JOB_PATH"] = os.path.expandvars("$HOME/.dataclay/$SLURM_JOB_ID")
     env["DATACLAY_LOG_PATH"] = env["DATACLAY_JOB_PATH"] + "/logs"
-    env["DATACLAY_ADMIN_USER"] = os.getenv("DATACLAY_ADMIN_USER", "admin")
-    env["DATACLAY_ADMIN_PASSWORD"] = os.getenv("DATACLAY_ADMIN_PASSWORD", "admin")
+    env["DATACLAY_USER"] = os.getenv("DATACLAY_USER", "testuser")
+    env["DATACLAY_PASSWORD"] = os.getenv("DATACLAY_PASSWORD", "s3cret")
 
     # Metadata config
-    env["METADATA_SERVICE_HOST"] = os.environ["METADATA_SERVICE_HOST"]
-    env["METADATA_SERVICE_PORT"] = os.getenv("METADATA_SERVICE_PORT", 16587)
+    env["DATACLAY_METADATA_HOST"] = os.environ["DATACLAY_METADATA_HOST"]
+    env["DATACLAY_METADATA_PORT"] = os.getenv("DATACLAY_METADATA_PORT", 16587)
 
     # Client config
-    env["DC_USERNAME"] = os.getenv("DC_USERNAME", "bsc_user")
-    env["DC_PASSWORD"] = os.getenv("DC_PASSWORD", "bsc_pass")
-    env["DEFAULT_DATASET"] = os.getenv("DEFAULT_DATASET", "bsc_dataset")
-    env["STUBS_PATH"] = os.getenv("STUBS_PATH", "./stubs")
+    env["DC_USERNAME"] = os.getenv("DC_USERNAME", "testuser")
+    env["DC_PASSWORD"] = os.getenv("DC_PASSWORD", "s3cret")
+    env["DC_DATASET"] = os.getenv("DC_DATASET", "testuser")
 
     env["TRACING"] = os.getenv("TRACING", "false") == "true"
     tracing_prefix = ""
